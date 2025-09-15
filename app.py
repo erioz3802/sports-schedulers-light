@@ -1163,7 +1163,12 @@ DASHBOARD_HTML = '''<!DOCTYPE html>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/js/bootstrap.bundle.min.js"></script>
     <script>
         // Global variables
-        let currentUser = {{ session | tojson | safe }};
+        let currentUser = {
+            user_id: {{ session.get('user_id', 0) }},
+            username: "{{ session.get('username', '') }}",
+            role: "{{ session.get('role', '') }}",
+            full_name: "{{ session.get('full_name', '') }}"
+        };
         let allGames = [];
         let allOfficials = [];
         let allLocations = [];
