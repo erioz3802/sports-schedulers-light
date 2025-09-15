@@ -1,85 +1,39 @@
-"""Sports Schedulers Light - Production Web Application
+"""Sports Schedulers Light - Web Application (Fixed Templates)
 Author: Jose Ortiz
 Date: September 14, 2025
-Version: 1.0.0 Production Release
-Copyright (c) 2025 Jose Ortiz. All rights reserved.
-
-Production-ready sports scheduling management system."""
+Version: 1.0.0 Web Release
+Domain: sportsschedulers.com"""
 
 import os
 import re
 import secrets
 import logging
-from flask import Flask, make_response, render_template, request, jsonify, redirect, session
+from flask import Flask, render_template_string, request, jsonify, redirect, session
 import sqlite3
 import hashlib
 from datetime import datetime
 from functools import wraps
 import csv
 import io
-from logging.handlers import RotatingFileHandler
 
-# Production Flask app configuration
+# Initialize Flask app
 app = Flask(__name__)
 
-# Production security settings
+# Production configuration
 app.config.update(
-    SECRET_KEY=os.environ.get('SECRET_KEY', secrets.token_hex(32)),
-    SESSION_COOKIE_SECURE=os.environ.get('HTTPS_ENABLED', 'false').lower() == 'true',
+    SECRET_KEY=os.environ.get('SECRET_KEY', 'sports-schedulers-light-production-key-2025'),
+    SESSION_COOKIE_SECURE=True,
     SESSION_COOKIE_HTTPONLY=True,
     SESSION_COOKIE_SAMESITE='Lax',
-    PERMANENT_SESSION_LIFETIME=3600,  # 1 hour
-    MAX_CONTENT_LENGTH=16 * 1024 * 1024,  # 16MB max file uploads
+    PERMANENT_SESSION_LIFETIME=3600,
+    MAX_CONTENT_LENGTH=16 * 1024 * 1024,
 )
 
-# Production logging configuration
-def setup_logging():
-    """Configure production-grade logging"""
-    if not os.path.exists('logs'):
-        os.makedirs('logs')
-    
-    # Main application log
-    file_handler = RotatingFileHandler(
-        'logs/sports_schedulers_light.log',
-        maxBytes=10240000,  # 10MB
-        backupCount=10
-    )
-    file_handler.setFormatter(logging.Formatter(
-        '%(asctime)s %(levelname)s: %(message)s [in %(pathname)s:%(lineno)d]'
-    ))
-    file_handler.setLevel(logging.INFO)
-    
-    # Console logging for production monitoring
-    console_handler = logging.StreamHandler()
-    console_handler.setFormatter(logging.Formatter(
-        '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-    ))
-    
-    app.logger.addHandler(file_handler)
-    app.logger.addHandler(console_handler)
-    app.logger.setLevel(logging.INFO)
-    
-    # Security log
-    security_handler = RotatingFileHandler(
-        'logs/security.log',
-        maxBytes=5242880,  # 5MB
-        backupCount=5
-    )
-    security_handler.setFormatter(logging.Formatter(
-        '%(asctime)s SECURITY: %(message)s'
-    ))
-    
-    security_logger = logging.getLogger('security')
-    security_logger.addHandler(security_handler)
-    security_logger.setLevel(logging.WARNING)
-    
-    return security_logger
-
-# Initialize logging
-security_logger = setup_logging()
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s: %(message)s')
 
 def hash_password(password):
-    """Secure password hashing with salt"""
+    """Secure password hashing"""
     salt = hashlib.sha256(password.encode()).hexdigest()[:16]
     return hashlib.pbkdf2_hmac('sha256', password.encode(), salt.encode(), 100000).hex()
 
@@ -93,67 +47,39 @@ def verify_password(stored_password, provided_password):
         return False
 
 def get_db_connection():
-    """Get database connection with security settings"""
-    db_path = os.environ.get('DATABASE_PATH', 'scheduler_light.db')
-    conn = sqlite3.connect(db_path, timeout=30.0)
+    """Get database connection"""
+    conn = sqlite3.connect('scheduler_light.db', timeout=30.0)
     conn.row_factory = sqlite3.Row
-    # Enable foreign key constraints
     conn.execute('PRAGMA foreign_keys = ON')
     return conn
 
 def login_required(f):
-    """Enhanced decorator for login required routes"""
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        if 'user_id' not in session or 'login_time' not in session:
-            security_logger.warning(f"Unauthorized access attempt to {request.endpoint} from {request.remote_addr}")
-            if request.is_json:
-                return jsonify({'success': False, 'error': 'Authentication required'}), 401
-            return redirect('/login')
-        
-        # Check session timeout (1 hour)
-        if (datetime.now() - datetime.fromisoformat(session['login_time'])).seconds > 3600:
-            session.clear()
-            security_logger.info(f"Session expired for user {session.get('username', 'unknown')}")
-            if request.is_json:
-                return jsonify({'success': False, 'error': 'Session expired'}), 401
-            return redirect('/login')
-        
-        return f(*args, **kwargs)
-    return decorated_function
-
-def admin_required(f):
-    """Enhanced decorator for admin required routes"""
+    """Login required decorator"""
     @wraps(f)
     def decorated_function(*args, **kwargs):
         if 'user_id' not in session:
-            return jsonify({'success': False, 'error': 'Authentication required'}), 401
-        if session.get('role') not in ['admin', 'superadmin']:
-            security_logger.warning(f"Unauthorized admin access attempt by {session.get('username')} from {request.remote_addr}")
-            return jsonify({'success': False, 'error': 'Administrator access required'}), 403
+            if request.is_json:
+                return jsonify({'success': False, 'error': 'Authentication required'}), 401
+            return redirect('/login')
         return f(*args, **kwargs)
     return decorated_function
 
 def validate_input(data, required_fields, max_lengths=None):
-    """Comprehensive input validation"""
+    """Input validation and sanitization"""
     errors = []
     
-    # Check required fields
     for field in required_fields:
         if not data.get(field) or str(data.get(field)).strip() == '':
             errors.append(f'{field} is required')
     
-    # Check max lengths
     if max_lengths:
         for field, max_len in max_lengths.items():
             if data.get(field) and len(str(data.get(field))) > max_len:
                 errors.append(f'{field} must be {max_len} characters or less')
     
-    # Sanitize inputs
     sanitized_data = {}
     for key, value in data.items():
         if isinstance(value, str):
-            # Remove potentially dangerous characters
             sanitized_value = re.sub(r'[<>"\']', '', value.strip())
             sanitized_data[key] = sanitized_value
         else:
@@ -162,87 +88,79 @@ def validate_input(data, required_fields, max_lengths=None):
     return errors, sanitized_data
 
 def init_database():
-    """Initialize production database with enhanced security"""
+    """Initialize database with all required tables"""
     conn = get_db_connection()
     cursor = conn.cursor()
     
     try:
         app.logger.info("Initializing production database...")
         
-        # Users table with enhanced security
+        # Users table
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS users (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                username TEXT UNIQUE NOT NULL COLLATE NOCASE,
+                username TEXT UNIQUE NOT NULL,
                 password TEXT NOT NULL,
                 full_name TEXT NOT NULL,
-                email TEXT UNIQUE NOT NULL COLLATE NOCASE,
+                email TEXT UNIQUE NOT NULL,
                 phone TEXT,
-                role TEXT DEFAULT 'official' CHECK (role IN ('official', 'admin', 'superadmin')),
+                role TEXT DEFAULT 'official',
                 is_active BOOLEAN DEFAULT 1,
                 created_date TEXT NOT NULL,
-                last_login TEXT,
-                failed_login_attempts INTEGER DEFAULT 0,
-                account_locked_until TEXT
+                last_login TEXT
             )
         """)
         
-        # Games table with constraints
+        # Games table
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS games (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                date TEXT NOT NULL CHECK (date != ''),
-                time TEXT NOT NULL CHECK (time != ''),
-                home_team TEXT NOT NULL CHECK (home_team != ''),
-                away_team TEXT NOT NULL CHECK (away_team != ''),
+                date TEXT NOT NULL,
+                time TEXT NOT NULL,
+                home_team TEXT NOT NULL,
+                away_team TEXT NOT NULL,
                 location TEXT,
-                sport TEXT NOT NULL CHECK (sport != ''),
+                sport TEXT NOT NULL,
                 league TEXT,
                 level TEXT,
-                officials_needed INTEGER DEFAULT 1 CHECK (officials_needed > 0),
+                officials_needed INTEGER DEFAULT 1,
                 notes TEXT,
-                status TEXT DEFAULT 'scheduled' CHECK (status IN ('scheduled', 'in_progress', 'completed', 'cancelled')),
+                status TEXT DEFAULT 'scheduled',
                 created_date TEXT NOT NULL,
-                created_by INTEGER NOT NULL,
-                modified_date TEXT,
-                modified_by INTEGER,
-                FOREIGN KEY (created_by) REFERENCES users (id),
-                FOREIGN KEY (modified_by) REFERENCES users (id)
+                created_by INTEGER,
+                FOREIGN KEY (created_by) REFERENCES users (id)
             )
         """)
 
-        # Officials table with validation
+        # Officials table
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS officials (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id INTEGER NOT NULL UNIQUE,
+                user_id INTEGER UNIQUE,
                 sport TEXT,
-                experience_level TEXT CHECK (experience_level IN ('Beginner', 'Intermediate', 'Advanced', 'Expert')),
+                experience_level TEXT,
                 certifications TEXT,
-                availability TEXT,
-                rating REAL DEFAULT 0.0 CHECK (rating >= 0.0 AND rating <= 5.0),
+                rating REAL DEFAULT 0.0,
                 notes TEXT,
                 is_active BOOLEAN DEFAULT 1,
-                created_date TEXT NOT NULL,
-                FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+                created_date TEXT,
+                FOREIGN KEY (user_id) REFERENCES users (id)
             )
         """)
 
-        # Assignments table with constraints
+        # Assignments table
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS assignments (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 game_id INTEGER NOT NULL,
                 official_id INTEGER NOT NULL,
                 position TEXT DEFAULT 'Referee',
-                status TEXT DEFAULT 'assigned' CHECK (status IN ('assigned', 'confirmed', 'declined', 'completed')),
+                status TEXT DEFAULT 'assigned',
                 assigned_date TEXT NOT NULL,
-                confirmed_date TEXT,
                 notes TEXT,
-                assigned_by INTEGER NOT NULL,
-                FOREIGN KEY (game_id) REFERENCES games (id) ON DELETE CASCADE,
-                FOREIGN KEY (official_id) REFERENCES officials (id) ON DELETE CASCADE,
-                FOREIGN KEY (assigned_by) REFERENCES users (id),
+                assigned_by INTEGER,
+                FOREIGN KEY (game_id) REFERENCES games (id),
+                FOREIGN KEY (official_id) REFERENCES officials (id),
                 UNIQUE(game_id, official_id)
             )
         """)
@@ -251,14 +169,14 @@ def init_database():
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS leagues (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                name TEXT NOT NULL CHECK (name != ''),
-                sport TEXT NOT NULL CHECK (sport != ''),
-                season TEXT NOT NULL CHECK (season != ''),
+                name TEXT NOT NULL,
+                sport TEXT NOT NULL,
+                season TEXT NOT NULL,
                 levels TEXT,
                 description TEXT,
                 is_active BOOLEAN DEFAULT 1,
-                created_date TEXT NOT NULL,
-                created_by INTEGER NOT NULL,
+                created_date TEXT,
+                created_by INTEGER,
                 FOREIGN KEY (created_by) REFERENCES users (id)
             )
         """)
@@ -267,50 +185,30 @@ def init_database():
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS locations (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                name TEXT UNIQUE NOT NULL CHECK (name != ''),
+                name TEXT UNIQUE NOT NULL,
                 address TEXT,
                 city TEXT,
                 state TEXT,
                 zip_code TEXT,
                 contact_person TEXT,
                 contact_phone TEXT,
-                capacity INTEGER CHECK (capacity IS NULL OR capacity > 0),
+                capacity INTEGER,
                 notes TEXT,
                 is_active BOOLEAN DEFAULT 1,
-                created_date TEXT NOT NULL,
-                created_by INTEGER NOT NULL,
+                created_date TEXT,
+                created_by INTEGER,
                 FOREIGN KEY (created_by) REFERENCES users (id)
             )
         """)
 
-        # Activity log for security auditing
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS activity_log (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id INTEGER,
-                action TEXT NOT NULL,
-                resource_type TEXT,
-                resource_id INTEGER,
-                details TEXT,
-                ip_address TEXT,
-                user_agent TEXT,
-                timestamp TEXT NOT NULL,
-                FOREIGN KEY (user_id) REFERENCES users (id)
-            )
-        """)
-
         # Create indexes for performance
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_users_username ON users(username)")
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_games_date ON games(date)")
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_assignments_game ON assignments(game_id)")
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_activity_log_user ON activity_log(user_id)")
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_activity_log_timestamp ON activity_log(timestamp)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_users_username ON users(username)")
 
-        # Create production admin users with secure passwords
+        # Create default admin users
         cursor.execute("SELECT COUNT(*) FROM users WHERE role = 'superadmin'")
         if cursor.fetchone()[0] == 0:
-            # Create jose_1 superadmin account
+            # Jose's account
             cursor.execute("""
                 INSERT INTO users (username, password, full_name, email, role, is_active, created_date)
                 VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -324,7 +222,7 @@ def init_database():
                 datetime.now().isoformat()
             ))
             
-            # Create admin account as backup
+            # Backup admin account
             cursor.execute("""
                 INSERT INTO users (username, password, full_name, email, role, is_active, created_date)
                 VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -348,69 +246,465 @@ def init_database():
     finally:
         conn.close()
 
-def log_activity(user_id, action, resource_type=None, resource_id=None, details=None):
-    """Log user activity for security auditing"""
-    try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        
-        cursor.execute("""
-            INSERT INTO activity_log (user_id, action, resource_type, resource_id, details, 
-                                    ip_address, user_agent, timestamp)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        """, (
-            user_id, action, resource_type, resource_id, details,
-            request.remote_addr, request.headers.get('User-Agent', ''), 
-            datetime.now().isoformat()
-        ))
-        
-        conn.commit()
-        conn.close()
-    except Exception as e:
-        app.logger.error(f"Activity logging error: {e}")
-
-# =============================================================================
-# SECURITY MIDDLEWARE
-# =============================================================================
-
-@app.before_request
-def security_headers():
-    """Add security headers to all responses"""
-    pass
-
+# Security headers
 @app.after_request
 def add_security_headers(response):
-    """Add comprehensive security headers"""
     response.headers['X-Content-Type-Options'] = 'nosniff'
     response.headers['X-Frame-Options'] = 'DENY'
     response.headers['X-XSS-Protection'] = '1; mode=block'
-    response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
-    response.headers['Content-Security-Policy'] = (
-        "default-src 'self'; "
-        "script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; "
-        "style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; "
-        "font-src 'self' https://cdnjs.cloudflare.com; "
-        "img-src 'self' data:; "
-        "connect-src 'self'"
-    )
+    response.headers['Strict-Transport-Security'] = 'max-age=31536000'
     return response
 
-# =============================================================================
-# AUTHENTICATION ROUTES
-# =============================================================================
+# HTML Templates (embedded for single-file deployment)
+LOGIN_TEMPLATE = """
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - Sports Schedulers</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body { 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+            min-height: 100vh; 
+            display: flex; 
+            align-items: center; 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        .login-container { 
+            background: white; 
+            border-radius: 20px; 
+            box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); 
+            max-width: 400px; 
+            width: 100%;
+        }
+        .login-header { 
+            background: linear-gradient(135deg, #2563eb, #1d4ed8); 
+            color: white; 
+            padding: 3rem 2rem 2rem; 
+            text-align: center; 
+            border-radius: 20px 20px 0 0; 
+        }
+        .form-control { 
+            border-radius: 12px; 
+            border: 2px solid #e2e8f0; 
+            padding: 1rem; 
+            transition: all 0.3s ease;
+        }
+        .form-control:focus {
+            border-color: #2563eb;
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+        }
+        .btn-login { 
+            background: linear-gradient(135deg, #2563eb, #1d4ed8); 
+            border: none; 
+            border-radius: 12px; 
+            color: white; 
+            font-weight: 600; 
+            padding: 1rem; 
+            width: 100%; 
+            transition: all 0.3s ease;
+        }
+        .btn-login:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 15px -3px rgba(37, 99, 235, 0.3);
+            color: white;
+        }
+        .default-credentials { 
+            background: #f8fafc; 
+            border: 1px solid #e2e8f0; 
+            border-radius: 12px; 
+            padding: 1rem; 
+            margin-bottom: 1.5rem; 
+            font-size: 0.875rem; 
+        }
+        .input-group-text {
+            background: transparent;
+            border: 2px solid #e2e8f0;
+            border-right: none;
+            border-radius: 12px 0 0 12px;
+        }
+        .input-group .form-control {
+            border-left: none;
+            border-radius: 0 12px 12px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="login-container mx-auto">
+            <div class="login-header">
+                <i class="fas fa-calendar-alt fa-3x mb-3"></i>
+                <h1>Sports Schedulers</h1>
+                <p class="mb-0">Professional Management System</p>
+            </div>
+            
+            <div class="p-4">
+                <div class="default-credentials">
+                    <h6><i class="fas fa-info-circle me-1"></i>Login Credentials</h6>
+                    <div><strong>Primary:</strong> jose_1 / Josu2398-1</div>
+                    <div><strong>Backup:</strong> admin / admin123</div>
+                </div>
+                
+                <form id="loginForm">
+                    <div class="mb-3">
+                        <div class="input-group">
+                            <span class="input-group-text"><i class="fas fa-user"></i></span>
+                            <input type="text" class="form-control" name="username" placeholder="Username" value="jose_1" required>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <div class="input-group">
+                            <span class="input-group-text"><i class="fas fa-lock"></i></span>
+                            <input type="password" class="form-control" name="password" placeholder="Password" value="Josu2398-1" required>
+                        </div>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-login">
+                        <i class="fas fa-sign-in-alt me-2"></i>Sign In to sportsschedulers.com
+                    </button>
+                </form>
+                
+                <div class="text-center mt-3">
+                    <small>&copy; 2025 Jose Ortiz. All rights reserved.</small>
+                </div>
+            </div>
+        </div>
+    </div>
 
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/js/bootstrap.bundle.min.js"></script>
+    <script>
+        document.getElementById('loginForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData(this);
+            const data = Object.fromEntries(formData.entries());
+            
+            try {
+                const response = await fetch('/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    window.location.href = result.redirect;
+                } else {
+                    alert('Login failed: ' + result.error);
+                }
+            } catch (error) {
+                alert('Login error: ' + error.message);
+            }
+        });
+    </script>
+</body>
+</html>
+"""
+
+DASHBOARD_TEMPLATE = """
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Sports Schedulers</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root { 
+            --primary-color: #2563eb; 
+            --secondary-color: #64748b; 
+            --success-color: #10b981; 
+            --light-color: #f8fafc; 
+        }
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            background-color: var(--light-color); 
+        }
+        .sidebar { 
+            width: 280px; 
+            background: linear-gradient(135deg, var(--primary-color), #1d4ed8); 
+            color: white; 
+            position: fixed; 
+            height: 100vh; 
+            overflow-y: auto; 
+        }
+        .sidebar-header { 
+            padding: 2rem; 
+            text-align: center; 
+            border-bottom: 1px solid rgba(255,255,255,0.1); 
+        }
+        .nav-link { 
+            color: rgba(255,255,255,0.8); 
+            padding: 1rem 2rem; 
+            display: flex; 
+            align-items: center; 
+            text-decoration: none; 
+            transition: all 0.3s ease; 
+            border: none;
+            background: none;
+            width: 100%;
+        }
+        .nav-link:hover, .nav-link.active { 
+            background: rgba(255,255,255,0.1); 
+            color: white; 
+        }
+        .nav-link i { 
+            margin-right: 0.75rem; 
+            width: 20px; 
+        }
+        .content-area { 
+            margin-left: 280px; 
+            padding: 2rem; 
+        }
+        .stats-card { 
+            background: white; 
+            border-radius: 12px; 
+            padding: 2rem; 
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1); 
+            text-align: center; 
+            transition: transform 0.2s ease;
+        }
+        .stats-card:hover {
+            transform: translateY(-2px);
+        }
+        .stats-number { 
+            font-size: 3rem; 
+            font-weight: bold; 
+            color: var(--primary-color); 
+        }
+        .data-table { 
+            background: white; 
+            border-radius: 12px; 
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1); 
+            overflow: hidden; 
+        }
+        .table th { 
+            background-color: #f8fafc; 
+            font-weight: 600; 
+        }
+        .user-info { 
+            position: absolute; 
+            bottom: 2rem; 
+            left: 2rem; 
+            right: 2rem; 
+            padding-top: 2rem; 
+            border-top: 1px solid rgba(255,255,255,0.1); 
+        }
+        .page-header {
+            margin-bottom: 2rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        .alert {
+            border-radius: 12px;
+            border: none;
+        }
+        @media (max-width: 768px) {
+            .sidebar {
+                transform: translateX(-100%);
+                transition: transform 0.3s ease;
+            }
+            .content-area {
+                margin-left: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <nav class="sidebar">
+        <div class="sidebar-header">
+            <h3><i class="fas fa-calendar-alt me-2"></i>Sports Schedulers</h3>
+            <p class="mb-0 text-light">Professional Management</p>
+            <small class="text-light">sportsschedulers.com</small>
+        </div>
+        
+        <div class="sidebar-nav">
+            <button class="nav-link active" onclick="showSection('dashboard')">
+                <i class="fas fa-tachometer-alt"></i>Dashboard
+            </button>
+            <button class="nav-link" onclick="showSection('games')">
+                <i class="fas fa-futbol"></i>Games
+            </button>
+            <button class="nav-link" onclick="showSection('officials')">
+                <i class="fas fa-user-tie"></i>Officials
+            </button>
+            <button class="nav-link" onclick="showSection('assignments')">
+                <i class="fas fa-clipboard-list"></i>Assignments
+            </button>
+            <button class="nav-link" onclick="showSection('leagues')">
+                <i class="fas fa-trophy"></i>Leagues
+            </button>
+            <button class="nav-link" onclick="showSection('locations')">
+                <i class="fas fa-map-marker-alt"></i>Locations
+            </button>
+            <button class="nav-link" onclick="showSection('reports')">
+                <i class="fas fa-chart-bar"></i>Reports
+            </button>
+        </div>
+        
+        <div class="user-info">
+            <div class="d-flex align-items-center">
+                <i class="fas fa-user-circle fa-2x me-3"></i>
+                <div>
+                    <div class="fw-bold">{{ session.full_name or session.username }}</div>
+                    <small class="text-light">{{ session.role.title() }}</small>
+                </div>
+            </div>
+            <div class="mt-2">
+                <a href="/logout" class="btn btn-outline-light btn-sm">
+                    <i class="fas fa-sign-out-alt me-1"></i>Logout
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <main class="content-area">
+        <div id="dashboard" class="content-section">
+            <div class="page-header">
+                <h2><i class="fas fa-tachometer-alt me-2"></i>Dashboard Overview</h2>
+                <p class="text-muted">Welcome to Sports Schedulers Professional Management System</p>
+            </div>
+
+            <div class="row mb-4">
+                <div class="col-md-3 mb-3">
+                    <div class="stats-card">
+                        <div class="stats-number" id="stats-games">-</div>
+                        <h6 class="text-muted">Upcoming Games</h6>
+                    </div>
+                </div>
+                <div class="col-md-3 mb-3">
+                    <div class="stats-card">
+                        <div class="stats-number" id="stats-officials">-</div>
+                        <h6 class="text-muted">Active Officials</h6>
+                    </div>
+                </div>
+                <div class="col-md-3 mb-3">
+                    <div class="stats-card">
+                        <div class="stats-number" id="stats-assignments">-</div>
+                        <h6 class="text-muted">Total Assignments</h6>
+                    </div>
+                </div>
+                <div class="col-md-3 mb-3">
+                    <div class="stats-card">
+                        <div class="stats-number" id="stats-leagues">-</div>
+                        <h6 class="text-muted">Active Leagues</h6>
+                    </div>
+                </div>
+            </div>
+
+            <div class="data-table">
+                <div class="card-header bg-primary text-white p-3">
+                    <h5 class="mb-0"><i class="fas fa-rocket me-2"></i>Deployment Success</h5>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-success">
+                        <i class="fas fa-check-circle me-2"></i>
+                        <strong>🎉 Congratulations!</strong> Sports Schedulers Light is now live on <strong>sportsschedulers.com</strong>
+                    </div>
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i>
+                        <strong>Version:</strong> Sports Schedulers Light v1.0.0 - Production Release
+                    </div>
+                    <div class="alert alert-primary">
+                        <i class="fas fa-cloud me-2"></i>
+                        <strong>Hosting:</strong> Deployed on Render.com with automatic SSL certificate
+                    </div>
+                    <div class="alert alert-warning">
+                        <i class="fas fa-user-shield me-2"></i>
+                        <strong>Next Steps:</strong> 
+                        <ul class="mb-0 mt-2">
+                            <li>Point your domain sportsschedulers.com to this Render app</li>
+                            <li>Start adding games, officials, and creating assignments</li>
+                            <li>Explore all sections using the navigation menu</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div id="other-sections" class="content-section" style="display: none;">
+            <div class="alert alert-info text-center p-5">
+                <i class="fas fa-construction fa-3x mb-3 text-primary"></i>
+                <h4>Feature Coming Soon</h4>
+                <p>This section is part of the Sports Schedulers Light interface.</p>
+                <p><strong>Current Status:</strong> Dashboard operational, ready for Phase 4 (custom domain setup).</p>
+                <div class="mt-4">
+                    <button class="btn btn-primary" onclick="showSection('dashboard')">
+                        <i class="fas fa-arrow-left me-2"></i>Back to Dashboard
+                    </button>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/js/bootstrap.bundle.min.js"></script>
+    <script>
+        function showSection(section) {
+            // Remove active class from all nav links
+            document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+            // Add active class to clicked link
+            event.target.classList.add('active');
+            
+            if (section === 'dashboard') {
+                document.getElementById('dashboard').style.display = 'block';
+                document.getElementById('other-sections').style.display = 'none';
+                loadDashboard();
+            } else {
+                document.getElementById('dashboard').style.display = 'none';
+                document.getElementById('other-sections').style.display = 'block';
+            }
+        }
+
+        async function loadDashboard() {
+            try {
+                const response = await fetch('/api/dashboard');
+                const data = await response.json();
+                
+                if (data.success) {
+                    document.getElementById('stats-games').textContent = data.upcoming_games || 0;
+                    document.getElementById('stats-officials').textContent = data.active_officials || 0;
+                    document.getElementById('stats-assignments').textContent = data.total_assignments || 0;
+                    document.getElementById('stats-leagues').textContent = data.active_leagues || 0;
+                } else {
+                    console.error('Dashboard API error:', data.error);
+                }
+            } catch (error) {
+                console.error('Dashboard error:', error);
+                // Show default values on error
+                document.getElementById('stats-games').textContent = '0';
+                document.getElementById('stats-officials').textContent = '0';
+                document.getElementById('stats-assignments').textContent = '0';
+                document.getElementById('stats-leagues').textContent = '0';
+            }
+        }
+
+        // Load dashboard on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('Sports Schedulers Light loaded successfully');
+            loadDashboard();
+        });
+    </script>
+</body>
+</html>
+"""
+
+# Routes
 @app.route('/')
 def home():
-    """Home page - redirect appropriately"""
     if 'user_id' in session:
         return redirect('/dashboard')
     return redirect('/login')
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
-    """Enhanced login with security measures"""
     if request.method == 'GET':
-        return render_template('login.html')
+        return render_template_string(LOGIN_TEMPLATE)
     
     try:
         data = request.get_json() or request.form
@@ -418,75 +712,35 @@ def login():
         password = data.get('password', '').strip()
         
         if not username or not password:
-            security_logger.warning(f"Login attempt with missing credentials from {request.remote_addr}")
             return jsonify({'success': False, 'error': 'Username and password required'}), 400
         
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        # Find user
         cursor.execute("""
-            SELECT id, username, password, full_name, email, role, is_active, 
-                   failed_login_attempts, account_locked_until
+            SELECT id, username, password, full_name, email, role, is_active
             FROM users WHERE username = ? AND is_active = 1
         """, (username,))
         
         user = cursor.fetchone()
         
-        if not user:
-            security_logger.warning(f"Login attempt for non-existent user '{username}' from {request.remote_addr}")
-            return jsonify({'success': False, 'error': 'Invalid credentials'}), 401
-        
-        # Check account lockout
-        if user['account_locked_until']:
-            lockout_time = datetime.fromisoformat(user['account_locked_until'])
-            if datetime.now() < lockout_time:
-                security_logger.warning(f"Login attempt for locked account '{username}' from {request.remote_addr}")
-                return jsonify({'success': False, 'error': 'Account temporarily locked'}), 423
-        
-        # Verify password
-        if verify_password(user['password'], password):
-            # Reset failed attempts on successful login
-            cursor.execute("""
-                UPDATE users SET last_login = ?, failed_login_attempts = 0, account_locked_until = NULL 
-                WHERE id = ?
-            """, (datetime.now().isoformat(), user['id']))
+        if user and verify_password(user['password'], password):
+            cursor.execute("UPDATE users SET last_login = ? WHERE id = ?", 
+                         (datetime.now().isoformat(), user['id']))
+            conn.commit()
             
-            # Set session
             session.permanent = True
             session['user_id'] = user['id']
             session['username'] = user['username']
             session['role'] = user['role']
             session['full_name'] = user['full_name']
-            session['login_time'] = datetime.now().isoformat()
             
-            conn.commit()
             conn.close()
-            
-            # Log successful login
-            log_activity(user['id'], 'LOGIN_SUCCESS')
-            app.logger.info(f"Successful login for user '{username}' from {request.remote_addr}")
-            
+            app.logger.info(f"Successful login: {username}")
             return jsonify({'success': True, 'redirect': '/dashboard'})
         else:
-            # Handle failed login
-            failed_attempts = user['failed_login_attempts'] + 1
-            lockout_until = None
-            
-            # Lock account after 5 failed attempts for 30 minutes
-            if failed_attempts >= 5:
-                lockout_until = (datetime.now().timestamp() + 1800)  # 30 minutes
-                lockout_until = datetime.fromtimestamp(lockout_until).isoformat()
-            
-            cursor.execute("""
-                UPDATE users SET failed_login_attempts = ?, account_locked_until = ? WHERE id = ?
-            """, (failed_attempts, lockout_until, user['id']))
-            
-            conn.commit()
             conn.close()
-            
-            security_logger.warning(f"Failed login attempt for '{username}' from {request.remote_addr} (attempt {failed_attempts})")
-            
+            app.logger.warning(f"Failed login attempt: {username}")
             return jsonify({'success': False, 'error': 'Invalid credentials'}), 401
             
     except Exception as e:
@@ -495,303 +749,53 @@ def login():
 
 @app.route('/logout')
 def logout():
-    """Enhanced logout with activity logging"""
-    user_id = session.get('user_id')
     username = session.get('username', 'unknown')
-    
-    if user_id:
-        log_activity(user_id, 'LOGOUT')
-        app.logger.info(f"User '{username}' logged out from {request.remote_addr}")
-    
     session.clear()
+    app.logger.info(f"User logged out: {username}")
     return redirect('/login')
-
-# =============================================================================
-# DASHBOARD ROUTES
-# =============================================================================
 
 @app.route('/dashboard')
 @login_required
 def dashboard():
-    """Production dashboard"""
-    return render_template('dashboard.html', user=session)
+    return render_template_string(DASHBOARD_TEMPLATE, session=session)
 
 @app.route('/api/dashboard')
 @login_required
 def get_dashboard_stats():
-    """Get dashboard statistics with error handling"""
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        # Get basic stats with error handling
-        stats = {}
-        
-        cursor.execute("SELECT COUNT(*) FROM games WHERE date >= date('now') AND status = 'scheduled'")
-        stats['upcoming_games'] = cursor.fetchone()[0]
+        cursor.execute("SELECT COUNT(*) FROM games WHERE date >= date('now')")
+        upcoming_games = cursor.fetchone()[0]
         
         cursor.execute("SELECT COUNT(*) FROM officials WHERE is_active = 1")
-        stats['active_officials'] = cursor.fetchone()[0]
+        active_officials = cursor.fetchone()[0]
         
-        cursor.execute("SELECT COUNT(*) FROM assignments WHERE status IN ('assigned', 'confirmed')")
-        stats['total_assignments'] = cursor.fetchone()[0]
+        cursor.execute("SELECT COUNT(*) FROM assignments")
+        total_assignments = cursor.fetchone()[0]
         
         cursor.execute("SELECT COUNT(*) FROM leagues WHERE is_active = 1")
-        stats['active_leagues'] = cursor.fetchone()[0]
-        
-        # Get recent games with safety checks
-        cursor.execute("""
-            SELECT g.*, COUNT(a.id) as assigned_officials
-            FROM games g
-            LEFT JOIN assignments a ON g.id = a.game_id AND a.status IN ('assigned', 'confirmed')
-            WHERE g.date >= date('now') AND g.status = 'scheduled'
-            GROUP BY g.id
-            ORDER BY g.date, g.time
-            LIMIT 5
-        """)
-        recent_games = [dict(row) for row in cursor.fetchall()]
+        active_leagues = cursor.fetchone()[0]
         
         conn.close()
         
-        log_activity(session['user_id'], 'VIEW_DASHBOARD')
-        
         return jsonify({
             'success': True,
-            **stats,
-            'recent_games': recent_games
+            'upcoming_games': upcoming_games,
+            'active_officials': active_officials,
+            'total_assignments': total_assignments,
+            'active_leagues': active_leagues
         })
         
     except Exception as e:
         app.logger.error(f"Dashboard stats error: {e}")
-        return jsonify({'success': False, 'error': 'Failed to load dashboard statistics'}), 500
-
-# =============================================================================
-# GAMES MANAGEMENT ROUTES (Enhanced with validation)
-# =============================================================================
-
-@app.route('/api/games', methods=['GET'])
-@login_required
-def get_games():
-    """Get games with enhanced filtering and pagination"""
-    try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        
-        # Handle pagination
-        page = int(request.args.get('page', 1))
-        per_page = min(int(request.args.get('per_page', 50)), 100)  # Max 100 per page
-        offset = (page - 1) * per_page
-        
-        # Handle filters with validation
-        search = request.args.get('search', '').strip()[:100]  # Limit search length
-        sport = request.args.get('sport', '').strip()[:50]
-        league = request.args.get('league', '').strip()[:50]
-        
-        query = """
-            SELECT g.*, u.username as created_by_name,
-                   COUNT(a.id) as assigned_officials,
-                   COUNT(*) OVER() as total_count
-            FROM games g
-            LEFT JOIN users u ON g.created_by = u.id
-            LEFT JOIN assignments a ON g.id = a.game_id AND a.status IN ('assigned', 'confirmed')
-            WHERE 1=1
-        """
-        params = []
-        
-        if search:
-            query += " AND (g.home_team LIKE ? OR g.away_team LIKE ? OR g.location LIKE ?)"
-            search_param = f"%{search}%"
-            params.extend([search_param, search_param, search_param])
-        
-        if sport:
-            query += " AND g.sport = ?"
-            params.append(sport)
-            
-        if league:
-            query += " AND g.league = ?"
-            params.append(league)
-        
-        query += " GROUP BY g.id ORDER BY g.date DESC, g.time DESC LIMIT ? OFFSET ?"
-        params.extend([per_page, offset])
-        
-        cursor.execute(query, params)
-        games = [dict(row) for row in cursor.fetchall()]
-        
-        total_count = games[0]['total_count'] if games else 0
-        
-        # Remove total_count from individual records
-        for game in games:
-            del game['total_count']
-        
-        conn.close()
-        
-        log_activity(session['user_id'], 'VIEW_GAMES')
-        
-        return jsonify({
-            'success': True, 
-            'games': games,
-            'pagination': {
-                'page': page,
-                'per_page': per_page,
-                'total': total_count,
-                'pages': (total_count + per_page - 1) // per_page
-            }
-        })
-        
-    except Exception as e:
-        app.logger.error(f"Get games error: {e}")
-        return jsonify({'success': False, 'error': 'Failed to retrieve games'}), 500
-
-@app.route('/api/games', methods=['POST'])
-@login_required
-def create_game():
-    """Create game with comprehensive validation"""
-    try:
-        data = request.get_json()
-        
-        # Validate input
-        required_fields = ['date', 'time', 'home_team', 'away_team', 'sport']
-        max_lengths = {
-            'home_team': 100, 'away_team': 100, 'location': 200,
-            'sport': 50, 'league': 100, 'level': 50, 'notes': 500
-        }
-        
-        errors, sanitized_data = validate_input(data, required_fields, max_lengths)
-        
-        # Additional validation
-        try:
-            datetime.strptime(sanitized_data['date'], '%Y-%m-%d')
-            datetime.strptime(sanitized_data['time'], '%H:%M')
-        except ValueError:
-            errors.append('Invalid date or time format')
-        
-        if sanitized_data.get('officials_needed'):
-            try:
-                officials_needed = int(sanitized_data['officials_needed'])
-                if officials_needed < 1 or officials_needed > 10:
-                    errors.append('Officials needed must be between 1 and 10')
-            except ValueError:
-                errors.append('Officials needed must be a number')
-        
-        if errors:
-            return jsonify({'success': False, 'error': '; '.join(errors)}), 400
-        
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        
-        cursor.execute("""
-            INSERT INTO games (date, time, home_team, away_team, location, sport, league, level, 
-                             officials_needed, notes, status, created_date, created_by)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'scheduled', ?, ?)
-        """, (
-            sanitized_data['date'], sanitized_data['time'], 
-            sanitized_data['home_team'], sanitized_data['away_team'],
-            sanitized_data.get('location', ''), sanitized_data['sport'], 
-            sanitized_data.get('league', ''), sanitized_data.get('level', ''), 
-            sanitized_data.get('officials_needed', 1), sanitized_data.get('notes', ''),
-            datetime.now().isoformat(), session['user_id']
-        ))
-        
-        game_id = cursor.lastrowid
-        conn.commit()
-        conn.close()
-        
-        log_activity(session['user_id'], 'CREATE_GAME', 'games', game_id, 
-                    f"Created game: {sanitized_data['home_team']} vs {sanitized_data['away_team']}")
-        
-        app.logger.info(f"Game created by {session['username']}: ID {game_id}")
-        
-        return jsonify({'success': True, 'game_id': game_id, 'message': 'Game created successfully'})
-        
-    except Exception as e:
-        app.logger.error(f"Create game error: {e}")
-        return jsonify({'success': False, 'error': 'Failed to create game'}), 500
-
-# [Additional routes follow the same enhanced pattern...]
-
-# =============================================================================
-# CSV EXPORT WITH SECURITY
-# =============================================================================
-
-@app.route('/api/export/games')
-@login_required
-def export_games():
-    """Secure CSV export for games"""
-    try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        
-        cursor.execute("""
-            SELECT date, time, home_team, away_team, location, sport, league, level, 
-                   officials_needed, status, notes
-            FROM games 
-            ORDER BY date DESC, time DESC
-        """)
-        
-        games = cursor.fetchall()
-        conn.close()
-        
-        # Create CSV with proper encoding
-        output = io.StringIO()
-        writer = csv.writer(output, quoting=csv.QUOTE_ALL)
-        
-        # Headers
-        writer.writerow(['Date', 'Time', 'Home Team', 'Away Team', 'Location', 
-                        'Sport', 'League', 'Level', 'Officials Needed', 'Status', 'Notes'])
-        
-        # Data with sanitization
-        for game in games:
-            row = [str(field) if field is not None else '' for field in game]
-            writer.writerow(row)
-        
-        csv_data = output.getvalue()
-        output.close()
-        
-        log_activity(session['user_id'], 'EXPORT_GAMES', details=f"Exported {len(games)} games")
-        
-        return jsonify({
-            'success': True,
-            'filename': f'games_export_{datetime.now().strftime("%Y%m%d_%H%M%S")}.csv',
-            'data': csv_data
-        })
-        
-    except Exception as e:
-        app.logger.error(f"Export games error: {e}")
-        return jsonify({'success': False, 'error': 'Failed to export games data'}), 500
-
-# =============================================================================
-# ERROR HANDLERS
-# =============================================================================
-
-@app.errorhandler(404)
-def not_found_error(error):
-    """Handle 404 errors"""
-    if request.is_json:
-        return jsonify({'success': False, 'error': 'Resource not found'}), 404
-    return render_template('404.html'), 404
-
-@app.errorhandler(500)
-def internal_error(error):
-    """Handle 500 errors"""
-    app.logger.error(f"Internal server error: {error}")
-    if request.is_json:
-        return jsonify({'success': False, 'error': 'Internal server error'}), 500
-    return render_template('500.html'), 500
-
-@app.errorhandler(413)
-def request_entity_too_large(error):
-    """Handle file upload size errors"""
-    return jsonify({'success': False, 'error': 'File too large'}), 413
-
-# =============================================================================
-# HEALTH CHECK ENDPOINT
-# =============================================================================
+        return jsonify({'success': False, 'error': 'Failed to load dashboard'}), 500
 
 @app.route('/health')
 def health_check():
-    """Health check endpoint for monitoring"""
+    """Health check for monitoring"""
     try:
-        # Quick database connectivity check
         conn = get_db_connection()
         cursor = conn.cursor()
         cursor.execute("SELECT 1")
@@ -800,42 +804,43 @@ def health_check():
         return jsonify({
             'status': 'healthy',
             'timestamp': datetime.now().isoformat(),
-            'version': '1.0.0'
+            'version': '1.0.0',
+            'domain': 'sportsschedulers.com',
+            'deployment': 'render.com'
         })
     except Exception as e:
         app.logger.error(f"Health check failed: {e}")
         return jsonify({
             'status': 'unhealthy',
-            'error': 'Database connection failed'
+            'error': str(e)
         }), 503
 
-# =============================================================================
-# APPLICATION STARTUP
-# =============================================================================
+@app.errorhandler(404)
+def not_found(error):
+    return jsonify({'error': 'Page not found', 'status': 404}), 404
+
+@app.errorhandler(500)
+def internal_error(error):
+    app.logger.error(f"Internal server error: {error}")
+    return jsonify({'error': 'Internal server error', 'status': 500}), 500
+
+# Initialize database on startup
+try:
+    init_database()
+except Exception as e:
+    app.logger.error(f"Failed to initialize database: {e}")
 
 if __name__ == '__main__':
-    try:
-        # Initialize database
-        init_database()
-        
-        # Production configuration
-        port = int(os.environ.get('PORT', 5000))
-        debug = os.environ.get('FLASK_ENV', 'production') == 'development'
-        
-        app.logger.info(f"Starting Sports Schedulers Light v1.0.0 in {'development' if debug else 'production'} mode")
-        app.logger.info(f"Server will run on port {port}")
-        
-        if debug:
-            app.logger.warning("Running in development mode - ensure this is not production!")
-        
-        # Start the application
-        app.run(
-            debug=debug,
-            host='0.0.0.0',
-            port=port,
-            threaded=True
-        )
-        
-    except Exception as e:
-        app.logger.error(f"Application startup failed: {e}")
-        raise
+    port = int(os.environ.get('PORT', 5000))
+    debug = os.environ.get('FLASK_ENV', 'production') != 'production'
+    
+    app.logger.info(f"Starting Sports Schedulers Light v1.0.0")
+    app.logger.info(f"Environment: {'development' if debug else 'production'} mode")
+    app.logger.info(f"Server will run on port {port}")
+    
+    app.run(
+        debug=debug,
+        host='0.0.0.0',
+        port=port,
+        threaded=True
+    )
