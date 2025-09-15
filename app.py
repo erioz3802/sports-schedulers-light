@@ -4,8 +4,6 @@ Date: September 14, 2025
 Company: JES Baseball LLC"""
 
 import os
-import re
-import secrets
 import logging
 import csv
 import io
@@ -18,7 +16,7 @@ from functools import wraps
 app = Flask(__name__)
 app.config.update(
     SECRET_KEY=os.environ.get('SECRET_KEY', 'sports-schedulers-light-production-key-2025'),
-    SESSION_COOKIE_SECURE=True,
+    SESSION_COOKIE_SECURE=False,  # Set to True in production with HTTPS
     SESSION_COOKIE_HTTPONLY=True,
     SESSION_COOKIE_SAMESITE='Lax',
     PERMANENT_SESSION_LIFETIME=3600,
@@ -27,24 +25,28 @@ app.config.update(
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s: %(message)s')
 
 def hash_password(password):
+    """Secure password hashing with salt"""
     salt = hashlib.sha256(password.encode()).hexdigest()[:16]
     return hashlib.pbkdf2_hmac('sha256', password.encode(), salt.encode(), 100000).hex()
 
 def verify_password(stored_password, provided_password):
+    """Verify password against stored hash"""
     try:
         salt = hashlib.sha256(provided_password.encode()).hexdigest()[:16]
         test_hash = hashlib.pbkdf2_hmac('sha256', provided_password.encode(), salt.encode(), 100000).hex()
         return test_hash == stored_password
-    except:
+    except Exception:
         return False
 
 def get_db_connection():
+    """Get database connection with proper configuration"""
     conn = sqlite3.connect('scheduler_light.db', timeout=30.0)
     conn.row_factory = sqlite3.Row
     conn.execute('PRAGMA foreign_keys = ON')
     return conn
 
 def login_required(f):
+    """Decorator for routes requiring authentication"""
     @wraps(f)
     def decorated_function(*args, **kwargs):
         if 'user_id' not in session:
@@ -55,6 +57,7 @@ def login_required(f):
     return decorated_function
 
 def admin_required(f):
+    """Decorator for routes requiring admin privileges"""
     @wraps(f)
     def decorated_function(*args, **kwargs):
         if 'user_id' not in session:
@@ -64,13 +67,26 @@ def admin_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
+def validate_input(data, required_fields):
+    """Validate input data and check for required fields"""
+    if not data:
+        return False, "No data provided"
+    
+    for field in required_fields:
+        if field not in data or not str(data[field]).strip():
+            return False, f"Field '{field}' is required"
+    
+    return True, None
+
 def init_database():
+    """Initialize database with all required tables"""
     conn = get_db_connection()
     cursor = conn.cursor()
     
     try:
         app.logger.info("Initializing production database...")
         
+        # Users table
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS users (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -86,6 +102,7 @@ def init_database():
             )
         """)
         
+        # Games table
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS games (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -106,6 +123,7 @@ def init_database():
             )
         """)
 
+        # Officials table
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS officials (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -121,6 +139,7 @@ def init_database():
             )
         """)
 
+        # Assignments table
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS assignments (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -132,11 +151,12 @@ def init_database():
                 notes TEXT,
                 assigned_by INTEGER,
                 FOREIGN KEY (game_id) REFERENCES games (id),
-                FOREIGN KEY (official_id) REFERENCES officials (id),
+                FOREIGN KEY (official_id) REFERENCES users (id),
                 UNIQUE(game_id, official_id)
             )
         """)
         
+        # Leagues table
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS leagues (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -151,29 +171,13 @@ def init_database():
                 FOREIGN KEY (created_by) REFERENCES users (id)
             )
         """)
-        
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS locations (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                name TEXT UNIQUE NOT NULL,
-                address TEXT,
-                city TEXT,
-                state TEXT,
-                zip_code TEXT,
-                contact_person TEXT,
-                contact_phone TEXT,
-                capacity INTEGER,
-                notes TEXT,
-                is_active BOOLEAN DEFAULT 1,
-                created_date TEXT,
-                created_by INTEGER,
-                FOREIGN KEY (created_by) REFERENCES users (id)
-            )
-        """)
 
+        # Create indexes for performance
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_games_date ON games(date)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_users_username ON users(username)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_assignments_game ON assignments(game_id)")
 
+        # Insert default admin users if they don't exist
         cursor.execute("SELECT COUNT(*) FROM users WHERE role = 'superadmin'")
         if cursor.fetchone()[0] == 0:
             cursor.execute("""
@@ -214,6 +218,7 @@ def init_database():
 
 @app.after_request
 def add_security_headers(response):
+    """Add security headers to all responses"""
     response.headers['X-Content-Type-Options'] = 'nosniff'
     response.headers['X-Frame-Options'] = 'DENY'
     response.headers['X-XSS-Protection'] = '1; mode=block'
@@ -292,6 +297,10 @@ LOGIN_HTML = '''<!DOCTYPE html>
             border-left: none;
             border-radius: 0 12px 12px 0;
         }
+        .alert {
+            margin-bottom: 1rem;
+            border-radius: 12px;
+        }
     </style>
 </head>
 <body>
@@ -309,6 +318,8 @@ LOGIN_HTML = '''<!DOCTYPE html>
                     <p class="mb-0 text-muted">Enter your authorized credentials to access the system</p>
                 </div>
                 
+                <div id="error-alert" class="alert alert-danger" style="display: none;"></div>
+                
                 <form id="loginForm">
                     <div class="mb-3">
                         <div class="input-group">
@@ -324,7 +335,7 @@ LOGIN_HTML = '''<!DOCTYPE html>
                         </div>
                     </div>
                     
-                    <button type="submit" class="btn btn-login">
+                    <button type="submit" class="btn btn-login" id="loginBtn">
                         <i class="fas fa-sign-in-alt me-2"></i>Access System
                     </button>
                 </form>
@@ -338,8 +349,23 @@ LOGIN_HTML = '''<!DOCTYPE html>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/js/bootstrap.bundle.min.js"></script>
     <script>
+        function showError(message) {
+            const errorAlert = document.getElementById('error-alert');
+            errorAlert.textContent = message;
+            errorAlert.style.display = 'block';
+        }
+
+        function hideError() {
+            document.getElementById('error-alert').style.display = 'none';
+        }
+
         document.getElementById('loginForm').addEventListener('submit', async function(e) {
             e.preventDefault();
+            hideError();
+            
+            const loginBtn = document.getElementById('loginBtn');
+            loginBtn.disabled = true;
+            loginBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Authenticating...';
             
             const formData = new FormData(this);
             const data = Object.fromEntries(formData.entries());
@@ -356,10 +382,14 @@ LOGIN_HTML = '''<!DOCTYPE html>
                 if (result.success) {
                     window.location.href = result.redirect;
                 } else {
-                    alert('Access denied: ' + result.error);
+                    showError(result.error || 'Login failed');
                 }
             } catch (error) {
-                alert('System error: ' + error.message);
+                showError('System error: Unable to connect to server');
+                console.error('Login error:', error);
+            } finally {
+                loginBtn.disabled = false;
+                loginBtn.innerHTML = '<i class="fas fa-sign-in-alt me-2"></i>Access System';
             }
         });
     </script>
@@ -378,7 +408,7 @@ DASHBOARD_HTML = '''<!DOCTYPE html>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f8fafc; }
         .sidebar { width: 280px; background: linear-gradient(135deg, #2563eb, #1d4ed8); color: white; position: fixed; height: 100vh; overflow-y: auto; }
         .sidebar-header { padding: 2rem; text-align: center; border-bottom: 1px solid rgba(255,255,255,0.1); }
-        .nav-link { color: rgba(255,255,255,0.8); padding: 1rem 2rem; display: flex; align-items: center; text-decoration: none; transition: all 0.3s ease; border: none; background: none; width: 100%; }
+        .nav-link { color: rgba(255,255,255,0.8); padding: 1rem 2rem; display: flex; align-items: center; text-decoration: none; transition: all 0.3s ease; border: none; background: none; width: 100%; cursor: pointer; }
         .nav-link:hover, .nav-link.active { background: rgba(255,255,255,0.1); color: white; }
         .nav-link i { margin-right: 0.75rem; width: 20px; }
         .content-area { margin-left: 280px; padding: 2rem; }
@@ -389,10 +419,15 @@ DASHBOARD_HTML = '''<!DOCTYPE html>
         .btn-custom { border-radius: 8px; padding: 0.5rem 1rem; }
         .modal-content { border-radius: 12px; }
         .form-control { border-radius: 8px; }
+        @media (max-width: 768px) {
+            .sidebar { width: 100%; transform: translateX(-100%); transition: transform 0.3s; z-index: 1000; }
+            .sidebar.show { transform: translateX(0); }
+            .content-area { margin-left: 0; }
+        }
     </style>
 </head>
 <body>
-    <nav class="sidebar">
+    <nav class="sidebar" id="sidebar">
         <div class="sidebar-header">
             <h3><i class="fas fa-calendar-alt me-2"></i>Sports Schedulers</h3>
             <p class="mb-0 text-light">JES Baseball LLC</p>
@@ -438,6 +473,11 @@ DASHBOARD_HTML = '''<!DOCTYPE html>
         </div>
     </nav>
 
+    <!-- Mobile menu button -->
+    <button class="btn btn-primary d-md-none position-fixed" style="top: 1rem; left: 1rem; z-index: 1001;" onclick="toggleSidebar()">
+        <i class="fas fa-bars"></i>
+    </button>
+
     <main class="content-area">
         <div id="main-content">
             <!-- Dashboard Section -->
@@ -476,7 +516,7 @@ DASHBOARD_HTML = '''<!DOCTYPE html>
 
                 <div class="alert alert-success">
                     <i class="fas fa-check-circle me-2"></i>
-                    <strong>Success!</strong> Sports Schedulers is now live on sportsschedulers.com for JES Baseball LLC
+                    <strong>Success!</strong> Sports Schedulers is now live for JES Baseball LLC
                 </div>
             </div>
 
@@ -530,9 +570,6 @@ DASHBOARD_HTML = '''<!DOCTYPE html>
                         <button class="btn btn-success btn-custom me-2" onclick="exportOfficials()">
                             <i class="fas fa-download me-1"></i>Export CSV
                         </button>
-                        <button class="btn btn-primary btn-custom" onclick="showAddOfficialModal()">
-                            <i class="fas fa-plus me-1"></i>Add Official
-                        </button>
                     </div>
                 </div>
 
@@ -546,12 +583,11 @@ DASHBOARD_HTML = '''<!DOCTYPE html>
                                 <th>Experience</th>
                                 <th>Rating</th>
                                 <th>Status</th>
-                                <th>Actions</th>
                             </tr>
                         </thead>
                         <tbody id="officials-table-body">
                             <tr>
-                                <td colspan="7" class="text-center">Loading officials...</td>
+                                <td colspan="6" class="text-center">Loading officials...</td>
                             </tr>
                         </tbody>
                     </table>
@@ -560,14 +596,9 @@ DASHBOARD_HTML = '''<!DOCTYPE html>
 
             <!-- Assignments Section -->
             <div id="assignments-section" class="content-section" style="display: none;">
-                <div class="d-flex justify-content-between align-items-center mb-4">
-                    <div>
-                        <h2><i class="fas fa-clipboard-list me-2"></i>Assignments Management</h2>
-                        <p class="text-muted">Assign officials to games</p>
-                    </div>
-                    <button class="btn btn-primary btn-custom" onclick="showAddAssignmentModal()">
-                        <i class="fas fa-plus me-1"></i>Create Assignment
-                    </button>
+                <div class="page-header mb-4">
+                    <h2><i class="fas fa-clipboard-list me-2"></i>Assignments Management</h2>
+                    <p class="text-muted">Assign officials to games</p>
                 </div>
 
                 <div class="table-responsive">
@@ -579,12 +610,11 @@ DASHBOARD_HTML = '''<!DOCTYPE html>
                                 <th>Official</th>
                                 <th>Position</th>
                                 <th>Status</th>
-                                <th>Actions</th>
                             </tr>
                         </thead>
                         <tbody id="assignments-table-body">
                             <tr>
-                                <td colspan="6" class="text-center">Loading assignments...</td>
+                                <td colspan="5" class="text-center">Loading assignments...</td>
                             </tr>
                         </tbody>
                     </table>
@@ -593,14 +623,9 @@ DASHBOARD_HTML = '''<!DOCTYPE html>
 
             <!-- Users Section -->
             <div id="users-section" class="content-section" style="display: none;">
-                <div class="d-flex justify-content-between align-items-center mb-4">
-                    <div>
-                        <h2><i class="fas fa-user-cog me-2"></i>Users Management</h2>
-                        <p class="text-muted">Manage system users and permissions</p>
-                    </div>
-                    <button class="btn btn-primary btn-custom" onclick="showAddUserModal()">
-                        <i class="fas fa-plus me-1"></i>Add User
-                    </button>
+                <div class="page-header mb-4">
+                    <h2><i class="fas fa-user-cog me-2"></i>Users Management</h2>
+                    <p class="text-muted">Manage system users and permissions</p>
                 </div>
 
                 <div class="table-responsive">
@@ -613,12 +638,11 @@ DASHBOARD_HTML = '''<!DOCTYPE html>
                                 <th>Role</th>
                                 <th>Status</th>
                                 <th>Last Login</th>
-                                <th>Actions</th>
                             </tr>
                         </thead>
                         <tbody id="users-table-body">
                             <tr>
-                                <td colspan="7" class="text-center">Loading users...</td>
+                                <td colspan="6" class="text-center">Loading users...</td>
                             </tr>
                         </tbody>
                     </table>
@@ -627,14 +651,9 @@ DASHBOARD_HTML = '''<!DOCTYPE html>
 
             <!-- Leagues Section -->
             <div id="leagues-section" class="content-section" style="display: none;">
-                <div class="d-flex justify-content-between align-items-center mb-4">
-                    <div>
-                        <h2><i class="fas fa-trophy me-2"></i>Leagues Management</h2>
-                        <p class="text-muted">Manage leagues and competition levels</p>
-                    </div>
-                    <button class="btn btn-primary btn-custom" onclick="showAddLeagueModal()">
-                        <i class="fas fa-plus me-1"></i>Add League
-                    </button>
+                <div class="page-header mb-4">
+                    <h2><i class="fas fa-trophy me-2"></i>Leagues Management</h2>
+                    <p class="text-muted">Manage leagues and competition levels</p>
                 </div>
 
                 <div class="table-responsive">
@@ -646,12 +665,11 @@ DASHBOARD_HTML = '''<!DOCTYPE html>
                                 <th>Season</th>
                                 <th>Levels</th>
                                 <th>Status</th>
-                                <th>Actions</th>
                             </tr>
                         </thead>
                         <tbody id="leagues-table-body">
                             <tr>
-                                <td colspan="6" class="text-center">Loading leagues...</td>
+                                <td colspan="5" class="text-center">Loading leagues...</td>
                             </tr>
                         </tbody>
                     </table>
@@ -745,11 +763,11 @@ DASHBOARD_HTML = '''<!DOCTYPE html>
                         <div class="row">
                             <div class="col-md-6 mb-3">
                                 <label class="form-label">Home Team</label>
-                                <input type="text" class="form-control" name="home_team" required>
+                                <input type="text" class="form-control" name="home_team" required maxlength="100">
                             </div>
                             <div class="col-md-6 mb-3">
                                 <label class="form-label">Away Team</label>
-                                <input type="text" class="form-control" name="away_team" required>
+                                <input type="text" class="form-control" name="away_team" required maxlength="100">
                             </div>
                         </div>
                         <div class="row">
@@ -766,22 +784,22 @@ DASHBOARD_HTML = '''<!DOCTYPE html>
                             </div>
                             <div class="col-md-6 mb-3">
                                 <label class="form-label">Location</label>
-                                <input type="text" class="form-control" name="location">
+                                <input type="text" class="form-control" name="location" maxlength="200">
                             </div>
                         </div>
                         <div class="row">
                             <div class="col-md-6 mb-3">
                                 <label class="form-label">League</label>
-                                <input type="text" class="form-control" name="league">
+                                <input type="text" class="form-control" name="league" maxlength="100">
                             </div>
                             <div class="col-md-6 mb-3">
                                 <label class="form-label">Level</label>
-                                <input type="text" class="form-control" name="level">
+                                <input type="text" class="form-control" name="level" maxlength="50">
                             </div>
                         </div>
                         <div class="mb-3">
                             <label class="form-label">Notes</label>
-                            <textarea class="form-control" name="notes" rows="3"></textarea>
+                            <textarea class="form-control" name="notes" rows="3" maxlength="500"></textarea>
                         </div>
                     </form>
                 </div>
@@ -795,7 +813,10 @@ DASHBOARD_HTML = '''<!DOCTYPE html>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/js/bootstrap.bundle.min.js"></script>
     <script>
-        // Navigation
+        function toggleSidebar() {
+            document.getElementById('sidebar').classList.toggle('show');
+        }
+
         function showSection(sectionName) {
             // Hide all sections
             document.querySelectorAll('.content-section').forEach(section => {
@@ -808,10 +829,19 @@ DASHBOARD_HTML = '''<!DOCTYPE html>
             });
             
             // Show selected section
-            document.getElementById(sectionName + '-section').style.display = 'block';
+            const section = document.getElementById(sectionName + '-section');
+            if (section) {
+                section.style.display = 'block';
+            }
             
             // Add active class to clicked nav link
-            document.querySelector(`[data-section="${sectionName}"]`).classList.add('active');
+            const navLink = document.querySelector(`[data-section="${sectionName}"]`);
+            if (navLink) {
+                navLink.classList.add('active');
+            }
+            
+            // Hide mobile sidebar
+            document.getElementById('sidebar').classList.remove('show');
             
             // Load section data
             loadSectionData(sectionName);
@@ -843,11 +873,28 @@ DASHBOARD_HTML = '''<!DOCTYPE html>
             }
         }
 
-        // Dashboard
+        async function fetchWithErrorHandling(url, options = {}) {
+            try {
+                const response = await fetch(url, options);
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                return await response.json();
+            } catch (error) {
+                console.error(`Error fetching ${url}:`, error);
+                throw error;
+            }
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
         async function loadDashboard() {
             try {
-                const response = await fetch('/api/dashboard');
-                const data = await response.json();
+                const data = await fetchWithErrorHandling('/api/dashboard');
                 
                 if (data.success) {
                     document.getElementById('stats-games').textContent = data.upcoming_games || 0;
@@ -860,28 +907,23 @@ DASHBOARD_HTML = '''<!DOCTYPE html>
             }
         }
 
-        // Games
         async function loadGames() {
             try {
-                const response = await fetch('/api/games');
-                const data = await response.json();
+                const data = await fetchWithErrorHandling('/api/games');
                 const tbody = document.getElementById('games-table-body');
                 
-                if (data.success && data.games) {
+                if (data.success && data.games && data.games.length > 0) {
                     tbody.innerHTML = '';
                     data.games.forEach(game => {
                         tbody.innerHTML += `
                             <tr>
-                                <td>${game.date}</td>
-                                <td>${game.time}</td>
-                                <td><strong>${game.home_team}</strong> vs ${game.away_team}</td>
-                                <td>${game.sport}</td>
-                                <td>${game.location || 'TBD'}</td>
-                                <td><span class="badge bg-success">${game.status}</span></td>
+                                <td>${escapeHtml(game.date)}</td>
+                                <td>${escapeHtml(game.time)}</td>
+                                <td><strong>${escapeHtml(game.home_team)}</strong> vs ${escapeHtml(game.away_team)}</td>
+                                <td>${escapeHtml(game.sport)}</td>
+                                <td>${escapeHtml(game.location || 'TBD')}</td>
+                                <td><span class="badge bg-success">${escapeHtml(game.status)}</span></td>
                                 <td>
-                                    <button class="btn btn-sm btn-outline-primary" onclick="editGame(${game.id})">
-                                        <i class="fas fa-edit"></i>
-                                    </button>
                                     <button class="btn btn-sm btn-outline-danger" onclick="deleteGame(${game.id})">
                                         <i class="fas fa-trash"></i>
                                     </button>
@@ -894,157 +936,124 @@ DASHBOARD_HTML = '''<!DOCTYPE html>
                 }
             } catch (error) {
                 console.error('Games loading error:', error);
+                document.getElementById('games-table-body').innerHTML = '<tr><td colspan="7" class="text-center text-danger">Error loading games</td></tr>';
             }
         }
 
-        // Officials
         async function loadOfficials() {
             try {
-                const response = await fetch('/api/officials');
-                const data = await response.json();
+                const data = await fetchWithErrorHandling('/api/officials');
                 const tbody = document.getElementById('officials-table-body');
                 
-                if (data.success && data.officials) {
+                if (data.success && data.officials && data.officials.length > 0) {
                     tbody.innerHTML = '';
                     data.officials.forEach(official => {
                         tbody.innerHTML += `
                             <tr>
-                                <td>${official.full_name || official.username}</td>
-                                <td>${official.email || 'N/A'}</td>
-                                <td>${official.phone || 'N/A'}</td>
-                                <td>${official.experience_level || 'N/A'}</td>
-                                <td>${official.rating || 0}/5</td>
+                                <td>${escapeHtml(official.full_name || official.username)}</td>
+                                <td>${escapeHtml(official.email || 'N/A')}</td>
+                                <td>${escapeHtml(official.phone || 'N/A')}</td>
+                                <td>${escapeHtml(official.experience_level || 'N/A')}</td>
+                                <td>${escapeHtml(official.rating || 0)}/5</td>
                                 <td><span class="badge bg-${official.is_active ? 'success' : 'secondary'}">${official.is_active ? 'Active' : 'Inactive'}</span></td>
-                                <td>
-                                    <button class="btn btn-sm btn-outline-primary" onclick="editOfficial(${official.id})">
-                                        <i class="fas fa-edit"></i>
-                                    </button>
-                                    <button class="btn btn-sm btn-outline-danger" onclick="deleteOfficial(${official.id})">
-                                        <i class="fas fa-trash"></i>
-                                    </button>
-                                </td>
                             </tr>
                         `;
                     });
                 } else {
-                    tbody.innerHTML = '<tr><td colspan="7" class="text-center">No officials found</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="6" class="text-center">No officials found</td></tr>';
                 }
             } catch (error) {
                 console.error('Officials loading error:', error);
+                document.getElementById('officials-table-body').innerHTML = '<tr><td colspan="6" class="text-center text-danger">Error loading officials</td></tr>';
             }
         }
 
-        // Assignments
         async function loadAssignments() {
             try {
-                const response = await fetch('/api/assignments');
-                const data = await response.json();
+                const data = await fetchWithErrorHandling('/api/assignments');
                 const tbody = document.getElementById('assignments-table-body');
                 
-                if (data.success && data.assignments) {
+                if (data.success && data.assignments && data.assignments.length > 0) {
                     tbody.innerHTML = '';
                     data.assignments.forEach(assignment => {
                         tbody.innerHTML += `
                             <tr>
-                                <td>${assignment.home_team} vs ${assignment.away_team}</td>
-                                <td>${assignment.date}</td>
-                                <td>${assignment.official_name}</td>
-                                <td>${assignment.position}</td>
-                                <td><span class="badge bg-info">${assignment.status}</span></td>
-                                <td>
-                                    <button class="btn btn-sm btn-outline-danger" onclick="deleteAssignment(${assignment.id})">
-                                        <i class="fas fa-trash"></i>
-                                    </button>
-                                </td>
+                                <td>${escapeHtml(assignment.home_team)} vs ${escapeHtml(assignment.away_team)}</td>
+                                <td>${escapeHtml(assignment.date)}</td>
+                                <td>${escapeHtml(assignment.official_name)}</td>
+                                <td>${escapeHtml(assignment.position)}</td>
+                                <td><span class="badge bg-info">${escapeHtml(assignment.status)}</span></td>
                             </tr>
                         `;
                     });
                 } else {
-                    tbody.innerHTML = '<tr><td colspan="6" class="text-center">No assignments found</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="5" class="text-center">No assignments found</td></tr>';
                 }
             } catch (error) {
                 console.error('Assignments loading error:', error);
+                document.getElementById('assignments-table-body').innerHTML = '<tr><td colspan="5" class="text-center text-danger">Error loading assignments</td></tr>';
             }
         }
 
-        // Users
         async function loadUsers() {
             try {
-                const response = await fetch('/api/users');
-                const data = await response.json();
+                const data = await fetchWithErrorHandling('/api/users');
                 const tbody = document.getElementById('users-table-body');
                 
-                if (data.success && data.users) {
+                if (data.success && data.users && data.users.length > 0) {
                     tbody.innerHTML = '';
                     data.users.forEach(user => {
+                        const lastLogin = user.last_login ? new Date(user.last_login).toLocaleDateString() : 'Never';
                         tbody.innerHTML += `
                             <tr>
-                                <td>${user.username}</td>
-                                <td>${user.full_name}</td>
-                                <td>${user.email}</td>
-                                <td><span class="badge bg-primary">${user.role}</span></td>
+                                <td>${escapeHtml(user.username)}</td>
+                                <td>${escapeHtml(user.full_name)}</td>
+                                <td>${escapeHtml(user.email)}</td>
+                                <td><span class="badge bg-primary">${escapeHtml(user.role)}</span></td>
                                 <td><span class="badge bg-${user.is_active ? 'success' : 'secondary'}">${user.is_active ? 'Active' : 'Inactive'}</span></td>
-                                <td>${user.last_login ? new Date(user.last_login).toLocaleDateString() : 'Never'}</td>
-                                <td>
-                                    <button class="btn btn-sm btn-outline-primary" onclick="editUser(${user.id})">
-                                        <i class="fas fa-edit"></i>
-                                    </button>
-                                    <button class="btn btn-sm btn-outline-danger" onclick="deleteUser(${user.id})">
-                                        <i class="fas fa-trash"></i>
-                                    </button>
-                                </td>
+                                <td>${escapeHtml(lastLogin)}</td>
                             </tr>
                         `;
                     });
                 } else {
-                    tbody.innerHTML = '<tr><td colspan="7" class="text-center">No users found</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="6" class="text-center">No users found</td></tr>';
                 }
             } catch (error) {
                 console.error('Users loading error:', error);
+                document.getElementById('users-table-body').innerHTML = '<tr><td colspan="6" class="text-center text-danger">Error loading users</td></tr>';
             }
         }
 
-        // Leagues
         async function loadLeagues() {
             try {
-                const response = await fetch('/api/leagues');
-                const data = await response.json();
+                const data = await fetchWithErrorHandling('/api/leagues');
                 const tbody = document.getElementById('leagues-table-body');
                 
-                if (data.success && data.leagues) {
+                if (data.success && data.leagues && data.leagues.length > 0) {
                     tbody.innerHTML = '';
                     data.leagues.forEach(league => {
                         tbody.innerHTML += `
                             <tr>
-                                <td>${league.name}</td>
-                                <td>${league.sport}</td>
-                                <td>${league.season}</td>
-                                <td>${league.levels || 'N/A'}</td>
+                                <td>${escapeHtml(league.name)}</td>
+                                <td>${escapeHtml(league.sport)}</td>
+                                <td>${escapeHtml(league.season)}</td>
+                                <td>${escapeHtml(league.levels || 'N/A')}</td>
                                 <td><span class="badge bg-${league.is_active ? 'success' : 'secondary'}">${league.is_active ? 'Active' : 'Inactive'}</span></td>
-                                <td>
-                                    <button class="btn btn-sm btn-outline-primary" onclick="editLeague(${league.id})">
-                                        <i class="fas fa-edit"></i>
-                                    </button>
-                                    <button class="btn btn-sm btn-outline-danger" onclick="deleteLeague(${league.id})">
-                                        <i class="fas fa-trash"></i>
-                                    </button>
-                                </td>
                             </tr>
                         `;
                     });
                 } else {
-                    tbody.innerHTML = '<tr><td colspan="6" class="text-center">No leagues found</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="5" class="text-center">No leagues found</td></tr>';
                 }
             } catch (error) {
                 console.error('Leagues loading error:', error);
+                document.getElementById('leagues-table-body').innerHTML = '<tr><td colspan="5" class="text-center text-danger">Error loading leagues</td></tr>';
             }
         }
 
-        // Reports
         async function loadReports() {
             try {
-                const response = await fetch('/api/dashboard');
-                const data = await response.json();
+                const data = await fetchWithErrorHandling('/api/dashboard');
                 
                 if (data.success) {
                     document.getElementById('report-games').textContent = data.upcoming_games || 0;
@@ -1057,32 +1066,21 @@ DASHBOARD_HTML = '''<!DOCTYPE html>
             }
         }
 
-        // Modal functions
         function showAddGameModal() {
-            new bootstrap.Modal(document.getElementById('addGameModal')).show();
+            const modal = new bootstrap.Modal(document.getElementById('addGameModal'));
+            modal.show();
         }
 
-        function showAddOfficialModal() {
-            alert('Add Official modal will be implemented');
-        }
-
-        function showAddAssignmentModal() {
-            alert('Add Assignment modal will be implemented');
-        }
-
-        function showAddUserModal() {
-            alert('Add User modal will be implemented');
-        }
-
-        function showAddLeagueModal() {
-            alert('Add League modal will be implemented');
-        }
-
-        // CRUD operations
         async function addGame() {
             const form = document.getElementById('addGameForm');
             const formData = new FormData(form);
             const data = Object.fromEntries(formData.entries());
+
+            // Basic validation
+            if (!data.date || !data.time || !data.home_team || !data.away_team || !data.sport) {
+                alert('Please fill in all required fields');
+                return;
+            }
 
             try {
                 const response = await fetch('/api/games', {
@@ -1091,38 +1089,45 @@ DASHBOARD_HTML = '''<!DOCTYPE html>
                     body: JSON.stringify(data)
                 });
 
-                if (response.ok) {
-                    bootstrap.Modal.getInstance(document.getElementById('addGameModal')).hide();
+                const result = await response.json();
+                if (result.success) {
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('addGameModal'));
+                    modal.hide();
                     form.reset();
                     loadGames();
                     alert('Game added successfully!');
                 } else {
-                    alert('Error adding game');
+                    alert('Error adding game: ' + (result.error || 'Unknown error'));
                 }
             } catch (error) {
                 console.error('Add game error:', error);
-                alert('Error adding game');
+                alert('Error adding game: Unable to connect to server');
             }
         }
 
         async function deleteGame(id) {
-            if (confirm('Are you sure you want to delete this game?')) {
-                try {
-                    const response = await fetch(`/api/games/${id}`, { method: 'DELETE' });
-                    if (response.ok) {
-                        loadGames();
-                        alert('Game deleted successfully!');
-                    } else {
-                        alert('Error deleting game');
-                    }
-                } catch (error) {
-                    console.error('Delete game error:', error);
-                    alert('Error deleting game');
+            if (!confirm('Are you sure you want to delete this game?')) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/games/${parseInt(id)}`, { 
+                    method: 'DELETE' 
+                });
+                
+                const result = await response.json();
+                if (result.success) {
+                    loadGames();
+                    alert('Game deleted successfully!');
+                } else {
+                    alert('Error deleting game: ' + (result.error || 'Unknown error'));
                 }
+            } catch (error) {
+                console.error('Delete game error:', error);
+                alert('Error deleting game: Unable to connect to server');
             }
         }
 
-        // Export functions
         function exportGames() {
             window.location.href = '/api/export/games';
         }
@@ -1139,41 +1144,10 @@ DASHBOARD_HTML = '''<!DOCTYPE html>
             window.location.href = '/api/export/users';
         }
 
-        // Edit functions (placeholders)
-        function editGame(id) {
-            alert('Edit Game functionality will be implemented');
-        }
-
-        function editOfficial(id) {
-            alert('Edit Official functionality will be implemented');
-        }
-
-        function editUser(id) {
-            alert('Edit User functionality will be implemented');
-        }
-
-        function editLeague(id) {
-            alert('Edit League functionality will be implemented');
-        }
-
-        function deleteOfficial(id) {
-            alert('Delete Official functionality will be implemented');
-        }
-
-        function deleteAssignment(id) {
-            alert('Delete Assignment functionality will be implemented');
-        }
-
-        function deleteUser(id) {
-            alert('Delete User functionality will be implemented');
-        }
-
-        function deleteLeague(id) {
-            alert('Delete League functionality will be implemented');
-        }
-
-        // Initialize
-        document.addEventListener('DOMContentLoaded', loadDashboard);
+        // Initialize dashboard on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            loadDashboard();
+        });
     </script>
 </body>
 </html>'''
@@ -1190,12 +1164,19 @@ def login():
         return render_template_string(LOGIN_HTML)
     
     try:
-        data = request.get_json() or request.form
-        username = data.get('username', '').strip().lower()
-        password = data.get('password', '').strip()
+        data = request.get_json()
+        if not data:
+            return jsonify({'success': False, 'error': 'Invalid request data'}), 400
+            
+        username = str(data.get('username', '')).strip().lower()
+        password = str(data.get('password', '')).strip()
         
+        # Basic validation
         if not username or not password:
             return jsonify({'success': False, 'error': 'Username and password required'}), 400
+            
+        if len(username) > 50 or len(password) > 200:
+            return jsonify({'success': False, 'error': 'Invalid credentials'}), 400
         
         conn = get_db_connection()
         cursor = conn.cursor()
@@ -1280,20 +1261,40 @@ def get_games():
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
-        cursor.execute("SELECT * FROM games ORDER BY date DESC, time DESC")
+        cursor.execute("SELECT * FROM games ORDER BY date DESC, time DESC LIMIT 1000")
         games = [dict(row) for row in cursor.fetchall()]
         conn.close()
         
         return jsonify({'success': True, 'games': games})
     except Exception as e:
         app.logger.error(f"Get games error: {e}")
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return jsonify({'success': False, 'error': 'Failed to load games'}), 500
 
 @app.route('/api/games', methods=['POST'])
 @login_required
 def create_game():
     try:
         data = request.get_json()
+        if not data:
+            return jsonify({'success': False, 'error': 'Invalid request data'}), 400
+        
+        # Validate required fields
+        valid, error = validate_input(data, ['date', 'time', 'home_team', 'away_team', 'sport'])
+        if not valid:
+            return jsonify({'success': False, 'error': error}), 400
+        
+        # Sanitize and validate data
+        game_data = {
+            'date': str(data['date']).strip()[:10],
+            'time': str(data['time']).strip()[:8],
+            'home_team': str(data['home_team']).strip()[:100],
+            'away_team': str(data['away_team']).strip()[:100],
+            'location': str(data.get('location', '')).strip()[:200],
+            'sport': str(data['sport']).strip()[:50],
+            'league': str(data.get('league', '')).strip()[:100],
+            'level': str(data.get('level', '')).strip()[:50],
+            'notes': str(data.get('notes', '')).strip()[:500]
+        }
         
         conn = get_db_connection()
         cursor = conn.cursor()
@@ -1302,9 +1303,9 @@ def create_game():
             INSERT INTO games (date, time, home_team, away_team, location, sport, league, level, notes, created_date, created_by)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
-            data['date'], data['time'], data['home_team'], data['away_team'],
-            data.get('location', ''), data['sport'], data.get('league', ''),
-            data.get('level', ''), data.get('notes', ''),
+            game_data['date'], game_data['time'], game_data['home_team'], game_data['away_team'],
+            game_data['location'], game_data['sport'], game_data['league'],
+            game_data['level'], game_data['notes'],
             datetime.now().isoformat(), session['user_id']
         ))
         
@@ -1315,15 +1316,19 @@ def create_game():
         return jsonify({'success': True, 'id': game_id})
     except Exception as e:
         app.logger.error(f"Create game error: {e}")
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return jsonify({'success': False, 'error': 'Failed to create game'}), 500
 
 @app.route('/api/games/<int:game_id>', methods=['DELETE'])
 @login_required
 def delete_game(game_id):
     try:
+        if game_id <= 0:
+            return jsonify({'success': False, 'error': 'Invalid game ID'}), 400
+            
         conn = get_db_connection()
         cursor = conn.cursor()
         
+        # Delete related assignments first
         cursor.execute("DELETE FROM assignments WHERE game_id = ?", (game_id,))
         cursor.execute("DELETE FROM games WHERE id = ?", (game_id,))
         
@@ -1333,7 +1338,7 @@ def delete_game(game_id):
         return jsonify({'success': True})
     except Exception as e:
         app.logger.error(f"Delete game error: {e}")
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return jsonify({'success': False, 'error': 'Failed to delete game'}), 500
 
 # Officials API
 @app.route('/api/officials', methods=['GET'])
@@ -1349,6 +1354,7 @@ def get_officials():
             LEFT JOIN officials o ON u.id = o.user_id
             WHERE u.is_active = 1
             ORDER BY u.full_name
+            LIMIT 1000
         """)
         officials = [dict(row) for row in cursor.fetchall()]
         conn.close()
@@ -1356,7 +1362,7 @@ def get_officials():
         return jsonify({'success': True, 'officials': officials})
     except Exception as e:
         app.logger.error(f"Get officials error: {e}")
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return jsonify({'success': False, 'error': 'Failed to load officials'}), 500
 
 # Assignments API
 @app.route('/api/assignments', methods=['GET'])
@@ -1372,6 +1378,7 @@ def get_assignments():
             JOIN games g ON a.game_id = g.id
             JOIN users u ON a.official_id = u.id
             ORDER BY g.date DESC
+            LIMIT 1000
         """)
         assignments = [dict(row) for row in cursor.fetchall()]
         conn.close()
@@ -1379,7 +1386,7 @@ def get_assignments():
         return jsonify({'success': True, 'assignments': assignments})
     except Exception as e:
         app.logger.error(f"Get assignments error: {e}")
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return jsonify({'success': False, 'error': 'Failed to load assignments'}), 500
 
 # Users API
 @app.route('/api/users', methods=['GET'])
@@ -1392,6 +1399,7 @@ def get_users():
             SELECT id, username, full_name, email, phone, role, is_active, last_login
             FROM users
             ORDER BY full_name
+            LIMIT 1000
         """)
         users = [dict(row) for row in cursor.fetchall()]
         conn.close()
@@ -1399,7 +1407,7 @@ def get_users():
         return jsonify({'success': True, 'users': users})
     except Exception as e:
         app.logger.error(f"Get users error: {e}")
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return jsonify({'success': False, 'error': 'Failed to load users'}), 500
 
 # Leagues API
 @app.route('/api/leagues', methods=['GET'])
@@ -1408,14 +1416,14 @@ def get_leagues():
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
-        cursor.execute("SELECT * FROM leagues WHERE is_active = 1 ORDER BY name")
+        cursor.execute("SELECT * FROM leagues WHERE is_active = 1 ORDER BY name LIMIT 1000")
         leagues = [dict(row) for row in cursor.fetchall()]
         conn.close()
         
         return jsonify({'success': True, 'leagues': leagues})
     except Exception as e:
         app.logger.error(f"Get leagues error: {e}")
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return jsonify({'success': False, 'error': 'Failed to load leagues'}), 500
 
 # Export APIs
 @app.route('/api/export/games')
@@ -1424,58 +1432,11 @@ def export_games():
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
-        cursor.execute("SELECT * FROM games ORDER BY date DESC")
+        cursor.execute("SELECT * FROM games ORDER BY date DESC LIMIT 10000")
         games = cursor.fetchall()
         conn.close()
         
         output = io.StringIO()
-        writer = csv.writer(output)
-        
-        writer.writerow(['Username', 'Full Name', 'Email', 'Phone', 'Role', 'Status', 'Created Date', 'Last Login'])
-        
-        for user in users:
-            writer.writerow([
-                user['username'], user['full_name'] or '', user['email'] or '',
-                user['phone'] or '', user['role'], user['status'],
-                user['created_date'], user['last_login'] or 'Never'
-            ])
-        
-        response = make_response(output.getvalue())
-        response.headers['Content-Type'] = 'text/csv'
-        response.headers['Content-Disposition'] = f'attachment; filename=users_export_{datetime.now().strftime("%Y%m%d")}.csv'
-        
-        return response
-    except Exception as e:
-        app.logger.error(f"Export users error: {e}")
-        return jsonify({'success': False, 'error': str(e)}), 500
-
-@app.route('/health')
-def health_check():
-    try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute("SELECT 1")
-        conn.close()
-        
-        return jsonify({
-            'status': 'healthy',
-            'timestamp': datetime.now().isoformat(),
-            'version': '1.0.0',
-            'company': 'JES Baseball LLC'
-        })
-    except Exception as e:
-        return jsonify({'status': 'unhealthy', 'error': str(e)}), 503
-
-try:
-    init_database()
-except Exception as e:
-    app.logger.error(f"Failed to initialize database: {e}")
-
-if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 5000))
-    app.logger.info(f"Starting Sports Schedulers Light v1.0.0 for JES Baseball LLC")
-    app.logger.info(f"Server will run on port {port}")
-    app.run(debug=False, host='0.0.0.0', port=port, threaded=True)IO()
         writer = csv.writer(output)
         
         writer.writerow(['Date', 'Time', 'Home Team', 'Away Team', 'Sport', 'Location', 'League', 'Level', 'Notes'])
@@ -1494,7 +1455,7 @@ if __name__ == '__main__':
         return response
     except Exception as e:
         app.logger.error(f"Export games error: {e}")
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return jsonify({'success': False, 'error': 'Export failed'}), 500
 
 @app.route('/api/export/officials')
 @login_required
@@ -1509,6 +1470,7 @@ def export_officials():
             FROM users u
             LEFT JOIN officials o ON u.id = o.user_id
             ORDER BY u.full_name
+            LIMIT 10000
         """)
         officials = cursor.fetchall()
         conn.close()
@@ -1532,7 +1494,7 @@ def export_officials():
         return response
     except Exception as e:
         app.logger.error(f"Export officials error: {e}")
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return jsonify({'success': False, 'error': 'Export failed'}), 500
 
 @app.route('/api/export/assignments')
 @login_required
@@ -1547,6 +1509,7 @@ def export_assignments():
             JOIN games g ON a.game_id = g.id
             JOIN users u ON a.official_id = u.id
             ORDER BY g.date DESC
+            LIMIT 10000
         """)
         assignments = cursor.fetchall()
         conn.close()
@@ -1570,7 +1533,7 @@ def export_assignments():
         return response
     except Exception as e:
         app.logger.error(f"Export assignments error: {e}")
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return jsonify({'success': False, 'error': 'Export failed'}), 500
 
 @app.route('/api/export/users')
 @login_required
@@ -1584,8 +1547,72 @@ def export_users():
                    created_date, last_login
             FROM users
             ORDER BY full_name
+            LIMIT 10000
         """)
         users = cursor.fetchall()
         conn.close()
         
-        output = io.String
+        output = io.StringIO()
+        writer = csv.writer(output)
+        
+        writer.writerow(['Username', 'Full Name', 'Email', 'Phone', 'Role', 'Status', 'Created Date', 'Last Login'])
+        
+        for user in users:
+            writer.writerow([
+                user['username'], user['full_name'] or '', user['email'] or '',
+                user['phone'] or '', user['role'], user['status'],
+                user['created_date'], user['last_login'] or 'Never'
+            ])
+        
+        response = make_response(output.getvalue())
+        response.headers['Content-Type'] = 'text/csv'
+        response.headers['Content-Disposition'] = f'attachment; filename=users_export_{datetime.now().strftime("%Y%m%d")}.csv'
+        
+        return response
+    except Exception as e:
+        app.logger.error(f"Export users error: {e}")
+        return jsonify({'success': False, 'error': 'Export failed'}), 500
+
+@app.route('/health')
+def health_check():
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT 1")
+        conn.close()
+        
+        return jsonify({
+            'status': 'healthy',
+            'timestamp': datetime.now().isoformat(),
+            'version': '1.0.0',
+            'company': 'JES Baseball LLC'
+        })
+    except Exception as e:
+        return jsonify({'status': 'unhealthy', 'error': str(e)}), 503
+
+@app.errorhandler(404)
+def not_found(error):
+    return jsonify({'success': False, 'error': 'Page not found'}), 404
+
+@app.errorhandler(500)
+def internal_error(error):
+    app.logger.error(f"Internal server error: {error}")
+    return jsonify({'success': False, 'error': 'Internal server error'}), 500
+
+# Initialize database on startup
+try:
+    init_database()
+    app.logger.info("Database initialization completed successfully")
+except Exception as e:
+    app.logger.error(f"Failed to initialize database: {e}")
+    raise
+
+if __name__ == '__main__':
+    port = int(os.environ.get('PORT', 5000))
+    debug_mode = os.environ.get('FLASK_DEBUG', 'False').lower() == 'true'
+    
+    app.logger.info(f"Starting Sports Schedulers Light v1.0.0 for JES Baseball LLC")
+    app.logger.info(f"Server will run on port {port}")
+    app.logger.info(f"Debug mode: {debug_mode}")
+    
+    app.run(debug=debug_mode, host='0.0.0.0', port=port, threaded=True)
