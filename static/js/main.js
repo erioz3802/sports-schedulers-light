@@ -23,17 +23,35 @@ function showToast(message, type = 'info') {
     if (!toastContainer) return;
 
     const toast = document.createElement('div');
-    toast.className = `toast ${type}`;
+    
+    // Use inline styles instead of CSS classes
+    const colors = {
+        'info': 'background: #3b82f6; color: white;',
+        'success': 'background: #10b981; color: white;', 
+        'error': 'background: #ef4444; color: white;',
+        'warning': 'background: #f59e0b; color: white;'
+    };
+    
+    toast.style.cssText = `
+        ${colors[type] || colors.info}
+        padding: 12px 16px;
+        border-radius: 8px;
+        margin-bottom: 8px;
+        box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        min-width: 300px;
+    `;
+    
     toast.innerHTML = `
-        <div class="flex items-center justify-between">
-            <div class="flex items-center">
-                <i class="fas ${getToastIcon(type)} mr-2"></i>
-                <span>${message}</span>
-            </div>
-            <button onclick="this.parentElement.parentElement.remove()" class="ml-4 text-gray-400 hover:text-gray-600">
-                <i class="fas fa-times"></i>
-            </button>
+        <div style="display: flex; align-items: center;">
+            <i class="fas fa-info-circle" style="margin-right: 8px;"></i>
+            <span>${message}</span>
         </div>
+        <button onclick="this.parentElement.remove()" style="background: none; border: none; color: white; cursor: pointer; padding: 0; margin-left: 12px;">
+            <i class="fas fa-times"></i>
+        </button>
     `;
 
     toastContainer.appendChild(toast);
@@ -119,6 +137,7 @@ function setActivePage(pageName) {
         games: { title: 'Games', subtitle: 'Manage games and schedules' },
         officials: { title: 'Officials', subtitle: 'Manage officials and referees' },
         assignments: { title: 'Assignments', subtitle: 'Manage game assignments' },
+        locations: { title: 'Locations', subtitle: 'Manage venues and facilities' },
         users: { title: 'Users', subtitle: 'Manage system users' },
         reports: { title: 'Reports', subtitle: 'View reports and analytics' }
     };
@@ -151,6 +170,9 @@ function loadPage(pageName) {
             break;
         case 'assignments':
             loadAssignments();
+            break;
+        case 'locations':
+            loadLocations();
             break;
         case 'users':
             loadUsers();
@@ -266,13 +288,66 @@ function loadGames() {
                 </button>
             </div>
             <div id="games-table">
-                <p class="text-gray-600">Loading games...</p>
+                <div class="overflow-x-auto">
+                    <table class="table w-full">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Time</th>
+                                <th>Teams</th>
+                                <th>Location</th>
+                                <th>Sport</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="games-tbody">
+                            <tr>
+                                <td colspan="7" class="text-center text-gray-600">Loading games...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
     `;
     
     updateMainContent(content);
-    // TODO: Load games data
+    loadGamesData();
+}
+
+async function loadGamesData() {
+    try {
+        const data = await apiRequest('/api/games');
+        const tbody = document.getElementById('games-tbody');
+        
+        if (data.success && data.games && data.games.length > 0) {
+            tbody.innerHTML = data.games.map(game => `
+                <tr>
+                    <td>${game.date}</td>
+                    <td>${game.time}</td>
+                    <td>${game.home_team} vs ${game.away_team}</td>
+                    <td>${game.location || 'TBA'}</td>
+                    <td>${game.sport || 'N/A'}</td>
+                    <td><span class="badge badge-${game.status === 'scheduled' ? 'info' : 'success'}">${game.status}</span></td>
+                    <td>
+                        <button class="btn btn-sm btn-secondary mr-2" onclick="editGame(${game.id})">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <button class="btn btn-sm btn-danger" onclick="deleteGame(${game.id})">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </td>
+                </tr>
+            `).join('');
+        } else {
+            tbody.innerHTML = '<tr><td colspan="7" class="text-center text-gray-600">No games found</td></tr>';
+        }
+    } catch (error) {
+        console.error('Error loading games:', error);
+        const tbody = document.getElementById('games-tbody');
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center text-red-600">Error loading games</td></tr>';
+    }
 }
 
 function loadOfficials() {
@@ -285,13 +360,68 @@ function loadOfficials() {
                 </button>
             </div>
             <div id="officials-table">
-                <p class="text-gray-600">Loading officials...</p>
+                <div class="overflow-x-auto">
+                    <table class="table w-full">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Email</th>
+                                <th>Phone</th>
+                                <th>Sports</th>
+                                <th>Experience</th>
+                                <th>Rating</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="officials-tbody">
+                            <tr>
+                                <td colspan="8" class="text-center text-gray-600">Loading officials...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
     `;
     
     updateMainContent(content);
-    // TODO: Load officials data
+    loadOfficialsData();
+}
+
+async function loadOfficialsData() {
+    try {
+        const data = await apiRequest('/api/officials');
+        const tbody = document.getElementById('officials-tbody');
+        
+        if (data.success && data.officials && data.officials.length > 0) {
+            tbody.innerHTML = data.officials.map(official => `
+                <tr>
+                    <td>${official.first_name} ${official.last_name}</td>
+                    <td>${official.email || 'N/A'}</td>
+                    <td>${official.phone || 'N/A'}</td>
+                    <td>${official.sports || 'N/A'}</td>
+                    <td>${official.experience_level || 'N/A'}</td>
+                    <td>${official.rating || 'N/A'}</td>
+                    <td><span class="badge badge-${official.is_active ? 'success' : 'danger'}">${official.is_active ? 'Active' : 'Inactive'}</span></td>
+                    <td>
+                        <button class="btn btn-sm btn-secondary mr-2" onclick="editOfficial(${official.id})">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <button class="btn btn-sm btn-danger" onclick="deleteOfficial(${official.id})">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </td>
+                </tr>
+            `).join('');
+        } else {
+            tbody.innerHTML = '<tr><td colspan="8" class="text-center text-gray-600">No officials found</td></tr>';
+        }
+    } catch (error) {
+        console.error('Error loading officials:', error);
+        const tbody = document.getElementById('officials-tbody');
+        tbody.innerHTML = '<tr><td colspan="8" class="text-center text-red-600">Error loading officials</td></tr>';
+    }
 }
 
 function loadAssignments() {
@@ -304,13 +434,66 @@ function loadAssignments() {
                 </button>
             </div>
             <div id="assignments-table">
-                <p class="text-gray-600">Loading assignments...</p>
+                <div class="overflow-x-auto">
+                    <table class="table w-full">
+                        <thead>
+                            <tr>
+                                <th>Game</th>
+                                <th>Date/Time</th>
+                                <th>Official</th>
+                                <th>Position</th>
+                                <th>Status</th>
+                                <th>Fee</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="assignments-tbody">
+                            <tr>
+                                <td colspan="7" class="text-center text-gray-600">Loading assignments...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
     `;
     
     updateMainContent(content);
-    // TODO: Load assignments data
+    loadAssignmentsData();
+}
+
+async function loadAssignmentsData() {
+    try {
+        const data = await apiRequest('/api/assignments');
+        const tbody = document.getElementById('assignments-tbody');
+        
+        if (data.success && data.assignments && data.assignments.length > 0) {
+            tbody.innerHTML = data.assignments.map(assignment => `
+                <tr>
+                    <td>${assignment.home_team} vs ${assignment.away_team}</td>
+                    <td>${assignment.date} ${assignment.time}</td>
+                    <td>${assignment.first_name} ${assignment.last_name}</td>
+                    <td>${assignment.position || 'N/A'}</td>
+                    <td><span class="badge badge-${assignment.status === 'confirmed' ? 'success' : 'warning'}">${assignment.status}</span></td>
+                    <td>$${assignment.fee || '0.00'}</td>
+                    <td>
+                        <button class="btn btn-sm btn-secondary mr-2" onclick="editAssignment(${assignment.id})">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <button class="btn btn-sm btn-danger" onclick="deleteAssignment(${assignment.id})">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </td>
+                </tr>
+            `).join('');
+        } else {
+            tbody.innerHTML = '<tr><td colspan="7" class="text-center text-gray-600">No assignments found</td></tr>';
+        }
+    } catch (error) {
+        console.error('Error loading assignments:', error);
+        const tbody = document.getElementById('assignments-tbody');
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center text-red-600">Error loading assignments</td></tr>';
+    }
 }
 
 function loadUsers() {
@@ -323,46 +506,210 @@ function loadUsers() {
                 </button>
             </div>
             <div id="users-table">
-                <p class="text-gray-600">Loading users...</p>
+                <div class="overflow-x-auto">
+                    <table class="table w-full">
+                        <thead>
+                            <tr>
+                                <th>Username</th>
+                                <th>Full Name</th>
+                                <th>Email</th>
+                                <th>Role</th>
+                                <th>Status</th>
+                                <th>Last Login</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="users-tbody">
+                            <tr>
+                                <td colspan="7" class="text-center text-gray-600">Loading users...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
     `;
     
     updateMainContent(content);
-    // TODO: Load users data
+    loadUsersData();
+}
+
+async function loadUsersData() {
+    try {
+        const data = await apiRequest('/api/users');
+        const tbody = document.getElementById('users-tbody');
+        
+        if (data.success && data.users && data.users.length > 0) {
+            tbody.innerHTML = data.users.map(user => `
+                <tr>
+                    <td>${user.username}</td>
+                    <td>${user.full_name || 'N/A'}</td>
+                    <td>${user.email || 'N/A'}</td>
+                    <td><span class="badge badge-${user.role === 'superadmin' ? 'danger' : user.role === 'admin' ? 'warning' : 'info'}">${user.role}</span></td>
+                    <td><span class="badge badge-${user.is_active ? 'success' : 'danger'}">${user.is_active ? 'Active' : 'Inactive'}</span></td>
+                    <td>${user.last_login ? new Date(user.last_login).toLocaleDateString() : 'Never'}</td>
+                    <td>
+                        <button class="btn btn-sm btn-secondary mr-2" onclick="editUser(${user.id})">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        ${user.role !== 'superadmin' ? `<button class="btn btn-sm btn-danger" onclick="deleteUser(${user.id})"><i class="fas fa-trash"></i></button>` : ''}
+                    </td>
+                </tr>
+            `).join('');
+        } else {
+            tbody.innerHTML = '<tr><td colspan="7" class="text-center text-gray-600">No users found</td></tr>';
+        }
+    } catch (error) {
+        console.error('Error loading users:', error);
+        const tbody = document.getElementById('users-tbody');
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center text-red-600">Error loading users</td></tr>';
+    }
+}
+
+function loadLocations() {
+    const content = `
+        <div class="card p-6">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-semibold">Locations Management</h3>
+                <button class="btn btn-primary" onclick="showAddLocationModal()">
+                    <i class="fas fa-plus mr-2"></i>Add Location
+                </button>
+            </div>
+            <div id="locations-table">
+                <div class="overflow-x-auto">
+                    <table class="table w-full">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Address</th>
+                                <th>City</th>
+                                <th>Contact</th>
+                                <th>Capacity</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="locations-tbody">
+                            <tr>
+                                <td colspan="7" class="text-center text-blue-600">Locations feature - Coming soon in Phase 4</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    updateMainContent(content);
 }
 
 function loadReports() {
     const content = `
-        <div class="card p-6">
-            <h3 class="text-lg font-semibold mb-4">Reports & Analytics</h3>
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                <div class="bg-blue-50 p-4 rounded-lg">
-                    <h4 class="font-medium text-blue-800 mb-2">Games Report</h4>
-                    <p class="text-sm text-blue-600 mb-3">Export all games data</p>
-                    <button class="btn btn-sm btn-primary" onclick="exportGames()">
-                        <i class="fas fa-download mr-2"></i>Download CSV
-                    </button>
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <!-- Quick Stats -->
+            <div class="card p-6">
+                <h3 class="text-lg font-semibold mb-4">Quick Statistics</h3>
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="bg-blue-50 p-4 rounded-lg text-center">
+                        <div class="text-2xl font-bold text-blue-600" id="total-games-stat">0</div>
+                        <div class="text-sm text-blue-800">Total Games</div>
+                    </div>
+                    <div class="bg-green-50 p-4 rounded-lg text-center">
+                        <div class="text-2xl font-bold text-green-600" id="total-officials-stat">0</div>
+                        <div class="text-sm text-green-800">Total Officials</div>
+                    </div>
+                    <div class="bg-purple-50 p-4 rounded-lg text-center">
+                        <div class="text-2xl font-bold text-purple-600" id="total-assignments-stat">0</div>
+                        <div class="text-sm text-purple-800">Total Assignments</div>
+                    </div>
+                    <div class="bg-yellow-50 p-4 rounded-lg text-center">
+                        <div class="text-2xl font-bold text-yellow-600" id="total-users-stat">0</div>
+                        <div class="text-sm text-yellow-800">Total Users</div>
+                    </div>
                 </div>
-                <div class="bg-green-50 p-4 rounded-lg">
-                    <h4 class="font-medium text-green-800 mb-2">Officials Report</h4>
-                    <p class="text-sm text-green-600 mb-3">Export officials data</p>
-                    <button class="btn btn-sm btn-primary" onclick="exportOfficials()">
-                        <i class="fas fa-download mr-2"></i>Download CSV
-                    </button>
+            </div>
+
+            <!-- Export Options -->
+            <div class="card p-6">
+                <h3 class="text-lg font-semibold mb-4">Data Export</h3>
+                <div class="space-y-3">
+                    <div class="bg-blue-50 p-4 rounded-lg">
+                        <h4 class="font-medium text-blue-800 mb-2">Games Report</h4>
+                        <p class="text-sm text-blue-600 mb-3">Export all games data with schedules and details</p>
+                        <button class="btn btn-sm btn-primary" onclick="exportGames()">
+                            <i class="fas fa-download mr-2"></i>Download CSV
+                        </button>
+                    </div>
+                    <div class="bg-green-50 p-4 rounded-lg">
+                        <h4 class="font-medium text-green-800 mb-2">Officials Report</h4>
+                        <p class="text-sm text-green-600 mb-3">Export officials data with contact info and ratings</p>
+                        <button class="btn btn-sm btn-primary" onclick="exportOfficials()">
+                            <i class="fas fa-download mr-2"></i>Download CSV
+                        </button>
+                    </div>
+                    <div class="bg-purple-50 p-4 rounded-lg">
+                        <h4 class="font-medium text-purple-800 mb-2">Assignments Report</h4>
+                        <p class="text-sm text-purple-600 mb-3">Export assignments data with game and official details</p>
+                        <button class="btn btn-sm btn-primary" onclick="exportAssignments()">
+                            <i class="fas fa-download mr-2"></i>Download CSV
+                        </button>
+                    </div>
                 </div>
-                <div class="bg-purple-50 p-4 rounded-lg">
-                    <h4 class="font-medium text-purple-800 mb-2">Assignments Report</h4>
-                    <p class="text-sm text-purple-600 mb-3">Export assignments data</p>
-                    <button class="btn btn-sm btn-primary" onclick="exportAssignments()">
-                        <i class="fas fa-download mr-2"></i>Download CSV
-                    </button>
+            </div>
+        </div>
+
+        <!-- Recent Activity -->
+        <div class="card p-6 mt-6">
+            <h3 class="text-lg font-semibold mb-4">Recent Activity Summary</h3>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div class="text-center">
+                    <div class="text-3xl font-bold text-blue-600" id="recent-games">0</div>
+                    <div class="text-sm text-gray-600">Games This Month</div>
+                </div>
+                <div class="text-center">
+                    <div class="text-3xl font-bold text-green-600" id="recent-assignments">0</div>
+                    <div class="text-sm text-gray-600">New Assignments</div>
+                </div>
+                <div class="text-center">
+                    <div class="text-3xl font-bold text-purple-600" id="active-officials-count">0</div>
+                    <div class="text-sm text-gray-600">Active Officials</div>
                 </div>
             </div>
         </div>
     `;
     
     updateMainContent(content);
+    loadReportsData();
+}
+
+async function loadReportsData() {
+    try {
+        // Load dashboard stats for reports
+        const dashboardData = await apiRequest('/api/dashboard');
+        if (dashboardData.success) {
+            document.getElementById('total-games-stat').textContent = dashboardData.upcoming_games || 0;
+            document.getElementById('total-officials-stat').textContent = dashboardData.active_officials || 0;
+            document.getElementById('total-assignments-stat').textContent = dashboardData.total_assignments || 0;
+            document.getElementById('recent-games').textContent = dashboardData.upcoming_games || 0;
+            document.getElementById('recent-assignments').textContent = dashboardData.total_assignments || 0;
+            document.getElementById('active-officials-count').textContent = dashboardData.active_officials || 0;
+        }
+
+        // Load users count
+        try {
+            const usersData = await apiRequest('/api/users');
+            if (usersData.success) {
+                document.getElementById('total-users-stat').textContent = usersData.users ? usersData.users.length : 0;
+            }
+        } catch (error) {
+            console.log('Users data not available (admin only)');
+            document.getElementById('total-users-stat').textContent = 'N/A';
+        }
+
+    } catch (error) {
+        console.error('Error loading reports data:', error);
+        showToast('Error loading reports data', 'error');
+    }
 }
 
 function updateMainContent(html) {
@@ -442,21 +789,67 @@ function downloadBlob(blob, filename) {
     window.URL.revokeObjectURL(url);
 }
 
-// Modal placeholder functions (to be implemented in Phase 2)
+// Modal placeholder functions (to be fully implemented in Phase 4)
 function showAddGameModal() {
-    showToast('Add Game modal - Coming in Phase 2', 'info');
+    showToast('Add Game modal - Full implementation coming in Phase 4', 'info');
 }
 
 function showAddOfficialModal() {
-    showToast('Add Official modal - Coming in Phase 2', 'info');
+    showToast('Add Official modal - Full implementation coming in Phase 4', 'info');
 }
 
 function showAddAssignmentModal() {
-    showToast('Add Assignment modal - Coming in Phase 2', 'info');
+    showToast('Add Assignment modal - Full implementation coming in Phase 4', 'info');
 }
 
 function showAddUserModal() {
-    showToast('Add User modal - Coming in Phase 2', 'info');
+    showToast('Add User modal - Full implementation coming in Phase 4', 'info');
+}
+
+function showAddLocationModal() {
+    showToast('Add Location modal - Full implementation coming in Phase 4', 'info');
+}
+
+// Edit functions
+function editGame(id) {
+    showToast(`Edit Game ${id} - Full implementation coming in Phase 4`, 'info');
+}
+
+function editOfficial(id) {
+    showToast(`Edit Official ${id} - Full implementation coming in Phase 4`, 'info');
+}
+
+function editAssignment(id) {
+    showToast(`Edit Assignment ${id} - Full implementation coming in Phase 4`, 'info');
+}
+
+function editUser(id) {
+    showToast(`Edit User ${id} - Full implementation coming in Phase 4`, 'info');
+}
+
+// Delete functions
+function deleteGame(id) {
+    if (confirm('Are you sure you want to delete this game?')) {
+        showToast(`Delete Game ${id} - Full implementation coming in Phase 4`, 'info');
+    }
+}
+
+function deleteOfficial(id) {
+    if (confirm('Are you sure you want to delete this official?')) {
+        showToast(`Delete Official ${id} - Full implementation coming in Phase 4`, 'info');
+    }
+}
+
+function deleteAssignment(id) {
+    if (confirm('Are you sure you want to delete this assignment?')) {
+        showToast(`Delete Assignment ${id} - Full implementation coming in Phase 4`, 'info');
+    }
+}
+
+function deleteUser(id) {
+    if (confirm('Are you sure you want to delete this user?')) {
+        showToast(`Delete User ${id} - Full implementation coming in Phase 4`, 'info');
+    }
 }
 
 // Mobile menu handling
