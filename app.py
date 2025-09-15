@@ -359,7 +359,7 @@ LOGIN_TEMPLATE = """
                     <div class="mb-3">
                         <div class="input-group">
                             <span class="input-group-text"><i class="fas fa-lock"></i></span>
-                            <input type="password" class="form-control" name="password" placeholder="Password" value="Josu2398-1" required>
+                            <input type="password" class="form-control" name="password" placeholder="Password" required>
                         </div>
                     </div>
                     
