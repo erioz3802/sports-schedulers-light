@@ -1163,12 +1163,13 @@ DASHBOARD_HTML = '''<!DOCTYPE html>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/js/bootstrap.bundle.min.js"></script>
     <script>
         // Global variables
-        let currentUser = {{ session | tojson }};
+        let currentUser = {{ session | tojson | safe }};
         let allGames = [];
         let allOfficials = [];
         let allLocations = [];
         let currentEditId = null;
         let currentEditType = null;
+        let currentImportType = null;
         let map = null;
         let locationMarker = null;
 
