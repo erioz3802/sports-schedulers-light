@@ -369,7 +369,7 @@ LOGIN_TEMPLATE = """
                 </form>
                 
                 <div class="text-center mt-3">
-                    <small>&copy; 2025 Jose Ortiz. All rights reserved.</small>
+                    <small>&copy; 2025 JES Baseball LLC. All rights reserved.</small>
                 </div>
             </div>
         </div>
