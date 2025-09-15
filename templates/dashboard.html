@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Sports Schedulers{% endblock %}
+
+{% block page_title %}Dashboard{% endblock %}
+{% block page_subtitle %}Welcome to your dashboard{% endblock %}
+
+{% block content %}
+<!-- Dashboard Stats Cards -->
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+    <div class="card p-6">
+        <div class="flex items-center">
+            <div class="p-3 rounded-full bg-blue-100 mr-4">
+                <i class="fas fa-calendar-alt text-blue-600 text-xl"></i>
+            </div>
+            <div>
+                <p class="text-2xl font-bold text-gray-900" id="upcoming-games">0</p>
+                <p class="text-gray-600">Upcoming Games</p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="card p-6">
+        <div class="flex items-center">
+            <div class="p-3 rounded-full bg-green-100 mr-4">
+                <i class="fas fa-users text-green-600 text-xl"></i>
+            </div>
+            <div>
+                <p class="text-2xl font-bold text-gray-900" id="active-officials">0</p>
+                <p class="text-gray-600">Active Officials</p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="card p-6">
+        <div class="flex items-center">
+            <div class="p-3 rounded-full bg-purple-100 mr-4">
+                <i class="fas fa-clipboard-check text-purple-600 text-xl"></i>
+            </div>
+            <div>
+                <p class="text-2xl font-bold text-gray-900" id="total-assignments">0</p>
+                <p class="text-gray-600">Total Assignments</p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="card p-6">
+        <div class="flex items-center">
+            <div class="p-3 rounded-full bg-yellow-100 mr-4">
+                <i class="fas fa-exclamation-triangle text-yellow-600 text-xl"></i>
+            </div>
+            <div>
+                <p class="text-2xl font-bold text-gray-900">0</p>
+                <p class="text-gray-600">Pending Assignments</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <div class="card p-6">
+        <h3 class="text-lg font-semibold mb-4">Welcome to the Web Version!</h3>
+        <p class="text-gray-600 mb-4">Your desktop application has been successfully converted to a multiuser web application.</p>
+        <div class="bg-green-50 border border-green-200 p-4 rounded-lg">
+            <h4 class="font-medium text-green-800 mb-2">✅ Migration Complete</h4>
+            <ul class="text-sm text-green-700 space-y-1">
+                <li>• All features preserved</li>
+                <li>• Real-time collaboration enabled</li>
+                <li>• Responsive design</li>
+                <li>• Same login credentials work</li>
+            </ul>
+        </div>
+    </div>
+    
+    <div class="card p-6">
+        <h3 class="text-lg font-semibold mb-4">Next Steps</h3>
+        <div class="space-y-3">
+            <div class="flex items-center p-3 bg-blue-50 rounded-lg">
+                <i class="fas fa-upload text-blue-600 mr-3"></i>
+                <span class="text-sm">Import your existing data</span>
+            </div>
+            <div class="flex items-center p-3 bg-purple-50 rounded-lg">
+                <i class="fas fa-users text-purple-600 mr-3"></i>
+                <span class="text-sm">Add team members</span>
+            </div>
+            <div class="flex items-center p-3 bg-green-50 rounded-lg">
+                <i class="fas fa-cogs text-green-600 mr-3"></i>
+                <span class="text-sm">Customize settings</span>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Load dashboard stats
+function loadDashboardStats() {
+    fetch('/api/dashboard')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                document.getElementById('upcoming-games').textContent = data.upcoming_games || 0;
+                document.getElementById('active-officials').textContent = data.active_officials || 0;
+                document.getElementById('total-assignments').textContent = data.total_assignments || 0;
+            }
+        })
+        .catch(error => {
+            console.error('Error loading dashboard stats:', error);
+        });
+}
+
+// Load stats when page loads
+document.addEventListener('DOMContentLoaded', loadDashboardStats);
+</script>
+{% endblock %}

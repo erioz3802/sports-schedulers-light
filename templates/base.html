@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Sports Schedulers{% endblock %}</title>
+    
+    <!-- CSS Dependencies -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    
+    <style>
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            background: #f8fafc;
+        }
+        
+        .sidebar {
+            background: linear-gradient(135deg, #2563eb, #1d4ed8);
+            transition: transform 0.3s ease;
+        }
+        
+        .nav-link {
+            transition: all 0.3s ease;
+            border-radius: 8px;
+            margin: 2px 0;
+        }
+        
+        .nav-link:hover {
+            background: rgba(255,255,255,0.1);
+            color: white !important;
+        }
+        
+        .nav-link.active {
+            background: rgba(255,255,255,0.2);
+            color: white !important;
+        }
+        
+        .card {
+            border: none;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+            transition: all 0.3s ease;
+        }
+        
+        .card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1);
+        }
+        
+        .loading {
+            display: none;
+        }
+        
+        .loading.show {
+            display: flex;
+        }
+        
+        /* Mobile responsive */
+        @media (max-width: 768px) {
+            .sidebar {
+                transform: translateX(-100%);
+            }
+            
+            .sidebar.mobile-open {
+                transform: translateX(0);
+            }
+        }
+    </style>
+    
+    {% block head %}{% endblock %}
+</head>
+<body class="bg-gray-50">
+    <!-- Mobile menu button -->
+    <div class="md:hidden fixed top-4 left-4 z-50">
+        <button id="mobile-menu-btn" class="bg-blue-600 text-white p-2 rounded-md">
+            <i class="fas fa-bars"></i>
+        </button>
+    </div>
+
+    <!-- Main container -->
+    <div class="flex h-screen">
+        <!-- Sidebar -->
+        <div id="sidebar" class="sidebar fixed md:relative w-64 h-full text-white z-40 md:z-auto">
+            <!-- Logo/Header -->
+            <div class="p-6 border-b border-white border-opacity-20">
+                <h1 class="text-xl font-bold">
+                    <i class="fas fa-calendar-check mr-2"></i>
+                    Sports Schedulers
+                </h1>
+                <p class="text-sm text-white text-opacity-80 mt-1">Multi-User Web App</p>
+            </div>
+
+            <!-- User Info -->
+            <div class="p-4 border-b border-white border-opacity-20">
+                <div class="flex items-center">
+                    <div class="w-10 h-10 bg-white bg-opacity-20 rounded-full flex items-center justify-center mr-3">
+                        <i class="fas fa-user text-white"></i>
+                    </div>
+                    <div>
+                        <p class="font-medium text-white">{{ session.full_name or session.username }}</p>
+                        <p class="text-xs text-white text-opacity-80">{{ session.role|title }}</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Navigation -->
+            <nav class="mt-6">
+                <div class="px-4">
+                    <p class="text-xs font-semibold text-white text-opacity-60 uppercase tracking-wider mb-3">
+                        Main Navigation
+                    </p>
+                </div>
+                
+                <a href="#" class="nav-link active flex items-center px-6 py-3 text-white" data-page="dashboard">
+                    <i class="fas fa-tachometer-alt mr-3 w-5"></i>
+                    Dashboard
+                </a>
+                
+                <a href="#" class="nav-link flex items-center px-6 py-3 text-white" data-page="games">
+                    <i class="fas fa-football-ball mr-3 w-5"></i>
+                    Games
+                </a>
+                
+                <a href="#" class="nav-link flex items-center px-6 py-3 text-white" data-page="officials">
+                    <i class="fas fa-users mr-3 w-5"></i>
+                    Officials
+                </a>
+                
+                <a href="#" class="nav-link flex items-center px-6 py-3 text-white" data-page="assignments">
+                    <i class="fas fa-clipboard-list mr-3 w-5"></i>
+                    Assignments
+                </a>
+
+                <!-- Admin sections -->
+                {% if session.role in ['admin', 'superadmin'] %}
+                <div id="admin-section" class="mt-6">
+                    <div class="px-4">
+                        <p class="text-xs font-semibold text-white text-opacity-60 uppercase tracking-wider mb-3">
+                            Management
+                        </p>
+                    </div>
+                    
+                    <a href="#" class="nav-link flex items-center px-6 py-3 text-white" data-page="users">
+                        <i class="fas fa-user-cog mr-3 w-5"></i>
+                        Users
+                    </a>
+                    
+                    <a href="#" class="nav-link flex items-center px-6 py-3 text-white" data-page="reports">
+                        <i class="fas fa-chart-bar mr-3 w-5"></i>
+                        Reports
+                    </a>
+                </div>
+                {% endif %}
+
+                <!-- Logout -->
+                <div class="mt-6">
+                    <a href="/logout" class="nav-link flex items-center px-6 py-3 text-white">
+                        <i class="fas fa-sign-out-alt mr-3 w-5"></i>
+                        Logout
+                    </a>
+                </div>
+            </nav>
+        </div>
+
+        <!-- Main content area -->
+        <div class="flex-1 flex flex-col overflow-hidden">
+            <!-- Top bar -->
+            <div class="bg-white border-b border-gray-200 px-6 py-4">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h2 id="page-title" class="text-2xl font-bold text-gray-900">{% block page_title %}Dashboard{% endblock %}</h2>
+                        <p id="page-subtitle" class="text-sm text-gray-600 mt-1">{% block page_subtitle %}Welcome to your dashboard{% endblock %}</p>
+                    </div>
+                    
+                    <!-- Real-time status indicator -->
+                    <div class="flex items-center space-x-4">
+                        <div id="connection-status" class="flex items-center text-sm">
+                            <div class="w-2 h-2 bg-green-400 rounded-full mr-2"></div>
+                            <span class="text-gray-600">Connected</span>
+                        </div>
+                        
+                        <!-- Notifications -->
+                        <div class="relative">
+                            <button id="notifications-btn" class="relative p-2 text-gray-400 hover:text-gray-600">
+                                <i class="fas fa-bell text-lg"></i>
+                                <span id="notification-count" class="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center hidden">0</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Page content -->
+            <div class="flex-1 overflow-auto">
+                <div class="p-6">
+                    {% block content %}
+                    <!-- Dynamic content will be loaded here -->
+                    <div id="main-content">
+                        <div class="flex justify-center items-center h-64">
+                            <div class="loading show items-center">
+                                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mr-3"></div>
+                                <span class="text-gray-600">Loading application...</span>
+                            </div>
+                        </div>
+                    </div>
+                    {% endblock %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Overlay for mobile -->
+    <div id="sidebar-overlay" class="fixed inset-0 bg-black bg-opacity-50 z-30 md:hidden hidden"></div>
+
+    <!-- Toast notifications container -->
+    <div id="toast-container" class="fixed top-4 right-4 space-y-2 z-50"></div>
+
+    <!-- JavaScript Dependencies -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/js/bootstrap.bundle.min.js"></script>
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+
+    {% block scripts %}{% endblock %}
+</body>
+</html>
