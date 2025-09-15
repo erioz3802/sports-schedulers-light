@@ -1,8 +1,7 @@
-"""Sports Schedulers Light - Web Application (Fixed Templates)
+"""Sports Schedulers Light - Clean Working Version
 Author: Jose Ortiz
 Date: September 14, 2025
-Version: 1.0.0 Web Release
-Domain: sportsschedulers.com"""
+Company: JES Baseball LLC"""
 
 import os
 import re
@@ -13,32 +12,23 @@ import sqlite3
 import hashlib
 from datetime import datetime
 from functools import wraps
-import csv
-import io
 
-# Initialize Flask app
 app = Flask(__name__)
-
-# Production configuration
 app.config.update(
     SECRET_KEY=os.environ.get('SECRET_KEY', 'sports-schedulers-light-production-key-2025'),
     SESSION_COOKIE_SECURE=True,
     SESSION_COOKIE_HTTPONLY=True,
     SESSION_COOKIE_SAMESITE='Lax',
     PERMANENT_SESSION_LIFETIME=3600,
-    MAX_CONTENT_LENGTH=16 * 1024 * 1024,
 )
 
-# Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s: %(message)s')
 
 def hash_password(password):
-    """Secure password hashing"""
     salt = hashlib.sha256(password.encode()).hexdigest()[:16]
     return hashlib.pbkdf2_hmac('sha256', password.encode(), salt.encode(), 100000).hex()
 
 def verify_password(stored_password, provided_password):
-    """Verify password against stored hash"""
     try:
         salt = hashlib.sha256(provided_password.encode()).hexdigest()[:16]
         test_hash = hashlib.pbkdf2_hmac('sha256', provided_password.encode(), salt.encode(), 100000).hex()
@@ -47,14 +37,12 @@ def verify_password(stored_password, provided_password):
         return False
 
 def get_db_connection():
-    """Get database connection"""
     conn = sqlite3.connect('scheduler_light.db', timeout=30.0)
     conn.row_factory = sqlite3.Row
     conn.execute('PRAGMA foreign_keys = ON')
     return conn
 
 def login_required(f):
-    """Login required decorator"""
     @wraps(f)
     def decorated_function(*args, **kwargs):
         if 'user_id' not in session:
@@ -64,38 +52,13 @@ def login_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
-def validate_input(data, required_fields, max_lengths=None):
-    """Input validation and sanitization"""
-    errors = []
-    
-    for field in required_fields:
-        if not data.get(field) or str(data.get(field)).strip() == '':
-            errors.append(f'{field} is required')
-    
-    if max_lengths:
-        for field, max_len in max_lengths.items():
-            if data.get(field) and len(str(data.get(field))) > max_len:
-                errors.append(f'{field} must be {max_len} characters or less')
-    
-    sanitized_data = {}
-    for key, value in data.items():
-        if isinstance(value, str):
-            sanitized_value = re.sub(r'[<>"\']', '', value.strip())
-            sanitized_data[key] = sanitized_value
-        else:
-            sanitized_data[key] = value
-    
-    return errors, sanitized_data
-
 def init_database():
-    """Initialize database with all required tables"""
     conn = get_db_connection()
     cursor = conn.cursor()
     
     try:
         app.logger.info("Initializing production database...")
         
-        # Users table
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS users (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -111,7 +74,6 @@ def init_database():
             )
         """)
         
-        # Games table
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS games (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -132,7 +94,6 @@ def init_database():
             )
         """)
 
-        # Officials table
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS officials (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -148,7 +109,6 @@ def init_database():
             )
         """)
 
-        # Assignments table
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS assignments (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -165,7 +125,6 @@ def init_database():
             )
         """)
         
-        # Leagues table
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS leagues (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -181,7 +140,6 @@ def init_database():
             )
         """)
         
-        # Locations table
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS locations (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -201,14 +159,11 @@ def init_database():
             )
         """)
 
-        # Create indexes for performance
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_games_date ON games(date)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_users_username ON users(username)")
 
-        # Create default admin users
         cursor.execute("SELECT COUNT(*) FROM users WHERE role = 'superadmin'")
         if cursor.fetchone()[0] == 0:
-            # Jose's account
             cursor.execute("""
                 INSERT INTO users (username, password, full_name, email, role, is_active, created_date)
                 VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -222,7 +177,6 @@ def init_database():
                 datetime.now().isoformat()
             ))
             
-            # Backup admin account
             cursor.execute("""
                 INSERT INTO users (username, password, full_name, email, role, is_active, created_date)
                 VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -246,18 +200,14 @@ def init_database():
     finally:
         conn.close()
 
-# Security headers
 @app.after_request
 def add_security_headers(response):
     response.headers['X-Content-Type-Options'] = 'nosniff'
     response.headers['X-Frame-Options'] = 'DENY'
     response.headers['X-XSS-Protection'] = '1; mode=block'
-    response.headers['Strict-Transport-Security'] = 'max-age=31536000'
     return response
 
-# HTML Templates (embedded for single-file deployment)
-LOGIN_TEMPLATE = """
-<!DOCTYPE html>
+LOGIN_HTML = '''<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -312,13 +262,13 @@ LOGIN_TEMPLATE = """
             box-shadow: 0 10px 15px -3px rgba(37, 99, 235, 0.3);
             color: white;
         }
-        .default-credentials { 
+        .welcome-message { 
             background: #f8fafc; 
             border: 1px solid #e2e8f0; 
             border-radius: 12px; 
-            padding: 1rem; 
+            padding: 1.5rem; 
             margin-bottom: 1.5rem; 
-            font-size: 0.875rem; 
+            text-align: center;
         }
         .input-group-text {
             background: transparent;
@@ -342,34 +292,33 @@ LOGIN_TEMPLATE = """
             </div>
             
             <div class="p-4">
-                <div class="default-credentials">
-                    <h6><i class="fas fa-info-circle me-1"></i>Login Credentials</h6>
-                    <div><strong>Primary:</strong> jose_1 / Josu2398-1</div>
-                    <div><strong>Backup:</strong> admin / admin123</div>
+                <div class="welcome-message">
+                    <h5><i class="fas fa-shield-alt me-2 text-primary"></i>Secure Access Portal</h5>
+                    <p class="mb-0 text-muted">Enter your authorized credentials to access the system</p>
                 </div>
                 
                 <form id="loginForm">
                     <div class="mb-3">
                         <div class="input-group">
                             <span class="input-group-text"><i class="fas fa-user"></i></span>
-                            <input type="text" class="form-control" name="username" placeholder="Username" value="jose_1" required>
+                            <input type="text" class="form-control" name="username" placeholder="Enter username" required autocomplete="off">
                         </div>
                     </div>
                     
                     <div class="mb-3">
                         <div class="input-group">
                             <span class="input-group-text"><i class="fas fa-lock"></i></span>
-                            <input type="password" class="form-control" name="password" placeholder="Password" required>
+                            <input type="password" class="form-control" name="password" placeholder="Enter password" required autocomplete="off">
                         </div>
                     </div>
                     
                     <button type="submit" class="btn btn-login">
-                        <i class="fas fa-sign-in-alt me-2"></i>Sign In to sportsschedulers.com
+                        <i class="fas fa-sign-in-alt me-2"></i>Access System
                     </button>
                 </form>
                 
-                <div class="text-center mt-3">
-                    <small>&copy; 2025 JES Baseball LLC. All rights reserved.</small>
+                <div class="text-center mt-4">
+                    <small class="text-muted">&copy; 2025 JES Baseball LLC. All rights reserved.</small>
                 </div>
             </div>
         </div>
@@ -395,19 +344,17 @@ LOGIN_TEMPLATE = """
                 if (result.success) {
                     window.location.href = result.redirect;
                 } else {
-                    alert('Login failed: ' + result.error);
+                    alert('Access denied: ' + result.error);
                 }
             } catch (error) {
-                alert('Login error: ' + error.message);
+                alert('System error: ' + error.message);
             }
         });
     </script>
 </body>
-</html>
-"""
+</html>'''
 
-DASHBOARD_TEMPLATE = """
-<!DOCTYPE html>
+DASHBOARD_HTML = '''<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -416,135 +363,28 @@ DASHBOARD_TEMPLATE = """
     <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <style>
-        :root { 
-            --primary-color: #2563eb; 
-            --secondary-color: #64748b; 
-            --success-color: #10b981; 
-            --light-color: #f8fafc; 
-        }
-        body { 
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
-            background-color: var(--light-color); 
-        }
-        .sidebar { 
-            width: 280px; 
-            background: linear-gradient(135deg, var(--primary-color), #1d4ed8); 
-            color: white; 
-            position: fixed; 
-            height: 100vh; 
-            overflow-y: auto; 
-        }
-        .sidebar-header { 
-            padding: 2rem; 
-            text-align: center; 
-            border-bottom: 1px solid rgba(255,255,255,0.1); 
-        }
-        .nav-link { 
-            color: rgba(255,255,255,0.8); 
-            padding: 1rem 2rem; 
-            display: flex; 
-            align-items: center; 
-            text-decoration: none; 
-            transition: all 0.3s ease; 
-            border: none;
-            background: none;
-            width: 100%;
-        }
-        .nav-link:hover, .nav-link.active { 
-            background: rgba(255,255,255,0.1); 
-            color: white; 
-        }
-        .nav-link i { 
-            margin-right: 0.75rem; 
-            width: 20px; 
-        }
-        .content-area { 
-            margin-left: 280px; 
-            padding: 2rem; 
-        }
-        .stats-card { 
-            background: white; 
-            border-radius: 12px; 
-            padding: 2rem; 
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1); 
-            text-align: center; 
-            transition: transform 0.2s ease;
-        }
-        .stats-card:hover {
-            transform: translateY(-2px);
-        }
-        .stats-number { 
-            font-size: 3rem; 
-            font-weight: bold; 
-            color: var(--primary-color); 
-        }
-        .data-table { 
-            background: white; 
-            border-radius: 12px; 
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1); 
-            overflow: hidden; 
-        }
-        .table th { 
-            background-color: #f8fafc; 
-            font-weight: 600; 
-        }
-        .user-info { 
-            position: absolute; 
-            bottom: 2rem; 
-            left: 2rem; 
-            right: 2rem; 
-            padding-top: 2rem; 
-            border-top: 1px solid rgba(255,255,255,0.1); 
-        }
-        .page-header {
-            margin-bottom: 2rem;
-            padding-bottom: 1rem;
-            border-bottom: 1px solid #e2e8f0;
-        }
-        .alert {
-            border-radius: 12px;
-            border: none;
-        }
-        @media (max-width: 768px) {
-            .sidebar {
-                transform: translateX(-100%);
-                transition: transform 0.3s ease;
-            }
-            .content-area {
-                margin-left: 0;
-            }
-        }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f8fafc; }
+        .sidebar { width: 280px; background: linear-gradient(135deg, #2563eb, #1d4ed8); color: white; position: fixed; height: 100vh; overflow-y: auto; }
+        .sidebar-header { padding: 2rem; text-align: center; border-bottom: 1px solid rgba(255,255,255,0.1); }
+        .nav-link { color: rgba(255,255,255,0.8); padding: 1rem 2rem; display: flex; align-items: center; text-decoration: none; transition: all 0.3s ease; border: none; background: none; width: 100%; }
+        .nav-link:hover, .nav-link.active { background: rgba(255,255,255,0.1); color: white; }
+        .nav-link i { margin-right: 0.75rem; width: 20px; }
+        .content-area { margin-left: 280px; padding: 2rem; }
+        .stats-card { background: white; border-radius: 12px; padding: 2rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); text-align: center; }
+        .stats-number { font-size: 3rem; font-weight: bold; color: #2563eb; }
+        .user-info { position: absolute; bottom: 2rem; left: 2rem; right: 2rem; padding-top: 2rem; border-top: 1px solid rgba(255,255,255,0.1); }
     </style>
 </head>
 <body>
     <nav class="sidebar">
         <div class="sidebar-header">
             <h3><i class="fas fa-calendar-alt me-2"></i>Sports Schedulers</h3>
-            <p class="mb-0 text-light">Professional Management</p>
-            <small class="text-light">sportsschedulers.com</small>
+            <p class="mb-0 text-light">JES Baseball LLC</p>
         </div>
         
         <div class="sidebar-nav">
             <button class="nav-link active" onclick="showSection('dashboard')">
                 <i class="fas fa-tachometer-alt"></i>Dashboard
-            </button>
-            <button class="nav-link" onclick="showSection('games')">
-                <i class="fas fa-futbol"></i>Games
-            </button>
-            <button class="nav-link" onclick="showSection('officials')">
-                <i class="fas fa-user-tie"></i>Officials
-            </button>
-            <button class="nav-link" onclick="showSection('assignments')">
-                <i class="fas fa-clipboard-list"></i>Assignments
-            </button>
-            <button class="nav-link" onclick="showSection('leagues')">
-                <i class="fas fa-trophy"></i>Leagues
-            </button>
-            <button class="nav-link" onclick="showSection('locations')">
-                <i class="fas fa-map-marker-alt"></i>Locations
-            </button>
-            <button class="nav-link" onclick="showSection('reports')">
-                <i class="fas fa-chart-bar"></i>Reports
             </button>
         </div>
         
@@ -565,102 +405,45 @@ DASHBOARD_TEMPLATE = """
     </nav>
 
     <main class="content-area">
-        <div id="dashboard" class="content-section">
-            <div class="page-header">
-                <h2><i class="fas fa-tachometer-alt me-2"></i>Dashboard Overview</h2>
-                <p class="text-muted">Welcome to Sports Schedulers Professional Management System</p>
-            </div>
+        <div class="page-header mb-4">
+            <h2><i class="fas fa-tachometer-alt me-2"></i>Dashboard Overview</h2>
+            <p class="text-muted">Welcome to Sports Schedulers - JES Baseball LLC</p>
+        </div>
 
-            <div class="row mb-4">
-                <div class="col-md-3 mb-3">
-                    <div class="stats-card">
-                        <div class="stats-number" id="stats-games">-</div>
-                        <h6 class="text-muted">Upcoming Games</h6>
-                    </div>
-                </div>
-                <div class="col-md-3 mb-3">
-                    <div class="stats-card">
-                        <div class="stats-number" id="stats-officials">-</div>
-                        <h6 class="text-muted">Active Officials</h6>
-                    </div>
-                </div>
-                <div class="col-md-3 mb-3">
-                    <div class="stats-card">
-                        <div class="stats-number" id="stats-assignments">-</div>
-                        <h6 class="text-muted">Total Assignments</h6>
-                    </div>
-                </div>
-                <div class="col-md-3 mb-3">
-                    <div class="stats-card">
-                        <div class="stats-number" id="stats-leagues">-</div>
-                        <h6 class="text-muted">Active Leagues</h6>
-                    </div>
+        <div class="row mb-4">
+            <div class="col-md-3 mb-3">
+                <div class="stats-card">
+                    <div class="stats-number" id="stats-games">0</div>
+                    <h6 class="text-muted">Upcoming Games</h6>
                 </div>
             </div>
-
-            <div class="data-table">
-                <div class="card-header bg-primary text-white p-3">
-                    <h5 class="mb-0"><i class="fas fa-rocket me-2"></i>Deployment Success</h5>
+            <div class="col-md-3 mb-3">
+                <div class="stats-card">
+                    <div class="stats-number" id="stats-officials">0</div>
+                    <h6 class="text-muted">Active Officials</h6>
                 </div>
-                <div class="card-body">
-                    <div class="alert alert-success">
-                        <i class="fas fa-check-circle me-2"></i>
-                        <strong>🎉 Congratulations!</strong> Sports Schedulers Light is now live on <strong>sportsschedulers.com</strong>
-                    </div>
-                    <div class="alert alert-info">
-                        <i class="fas fa-info-circle me-2"></i>
-                        <strong>Version:</strong> Sports Schedulers Light v1.0.0 - Production Release
-                    </div>
-                    <div class="alert alert-primary">
-                        <i class="fas fa-cloud me-2"></i>
-                        <strong>Hosting:</strong> Deployed on Render.com with automatic SSL certificate
-                    </div>
-                    <div class="alert alert-warning">
-                        <i class="fas fa-user-shield me-2"></i>
-                        <strong>Next Steps:</strong> 
-                        <ul class="mb-0 mt-2">
-                            <li>Point your domain sportsschedulers.com to this Render app</li>
-                            <li>Start adding games, officials, and creating assignments</li>
-                            <li>Explore all sections using the navigation menu</li>
-                        </ul>
-                    </div>
+            </div>
+            <div class="col-md-3 mb-3">
+                <div class="stats-card">
+                    <div class="stats-number" id="stats-assignments">0</div>
+                    <h6 class="text-muted">Total Assignments</h6>
+                </div>
+            </div>
+            <div class="col-md-3 mb-3">
+                <div class="stats-card">
+                    <div class="stats-number" id="stats-leagues">0</div>
+                    <h6 class="text-muted">Active Leagues</h6>
                 </div>
             </div>
         </div>
-        
-        <div id="other-sections" class="content-section" style="display: none;">
-            <div class="alert alert-info text-center p-5">
-                <i class="fas fa-construction fa-3x mb-3 text-primary"></i>
-                <h4>Feature Coming Soon</h4>
-                <p>This section is part of the Sports Schedulers Light interface.</p>
-                <p><strong>Current Status:</strong> Dashboard operational, ready for Phase 4 (custom domain setup).</p>
-                <div class="mt-4">
-                    <button class="btn btn-primary" onclick="showSection('dashboard')">
-                        <i class="fas fa-arrow-left me-2"></i>Back to Dashboard
-                    </button>
-                </div>
-            </div>
+
+        <div class="alert alert-success">
+            <i class="fas fa-check-circle me-2"></i>
+            <strong>Success!</strong> Sports Schedulers is now live on sportsschedulers.com for JES Baseball LLC
         </div>
     </main>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/js/bootstrap.bundle.min.js"></script>
     <script>
-        function showSection(section) {
-            // Remove active class from all nav links
-            document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
-            // Add active class to clicked link
-            event.target.classList.add('active');
-            
-            if (section === 'dashboard') {
-                document.getElementById('dashboard').style.display = 'block';
-                document.getElementById('other-sections').style.display = 'none';
-                loadDashboard();
-            } else {
-                document.getElementById('dashboard').style.display = 'none';
-                document.getElementById('other-sections').style.display = 'block';
-            }
-        }
-
         async function loadDashboard() {
             try {
                 const response = await fetch('/api/dashboard');
@@ -671,30 +454,23 @@ DASHBOARD_TEMPLATE = """
                     document.getElementById('stats-officials').textContent = data.active_officials || 0;
                     document.getElementById('stats-assignments').textContent = data.total_assignments || 0;
                     document.getElementById('stats-leagues').textContent = data.active_leagues || 0;
-                } else {
-                    console.error('Dashboard API error:', data.error);
                 }
             } catch (error) {
                 console.error('Dashboard error:', error);
-                // Show default values on error
-                document.getElementById('stats-games').textContent = '0';
-                document.getElementById('stats-officials').textContent = '0';
-                document.getElementById('stats-assignments').textContent = '0';
-                document.getElementById('stats-leagues').textContent = '0';
             }
         }
 
-        // Load dashboard on page load
-        document.addEventListener('DOMContentLoaded', function() {
-            console.log('Sports Schedulers Light loaded successfully');
-            loadDashboard();
-        });
+        function showSection(section) {
+            if (section === 'dashboard') {
+                loadDashboard();
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', loadDashboard);
     </script>
 </body>
-</html>
-"""
+</html>'''
 
-# Routes
 @app.route('/')
 def home():
     if 'user_id' in session:
@@ -704,7 +480,7 @@ def home():
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'GET':
-        return render_template_string(LOGIN_TEMPLATE)
+        return render_template_string(LOGIN_HTML)
     
     try:
         data = request.get_json() or request.form
@@ -749,15 +525,13 @@ def login():
 
 @app.route('/logout')
 def logout():
-    username = session.get('username', 'unknown')
     session.clear()
-    app.logger.info(f"User logged out: {username}")
     return redirect('/login')
 
 @app.route('/dashboard')
 @login_required
 def dashboard():
-    return render_template_string(DASHBOARD_TEMPLATE, session=session)
+    return render_template_string(DASHBOARD_HTML, session=session)
 
 @app.route('/api/dashboard')
 @login_required
@@ -794,7 +568,6 @@ def get_dashboard_stats():
 
 @app.route('/health')
 def health_check():
-    """Health check for monitoring"""
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
@@ -805,26 +578,11 @@ def health_check():
             'status': 'healthy',
             'timestamp': datetime.now().isoformat(),
             'version': '1.0.0',
-            'domain': 'sportsschedulers.com',
-            'deployment': 'render.com'
+            'company': 'JES Baseball LLC'
         })
     except Exception as e:
-        app.logger.error(f"Health check failed: {e}")
-        return jsonify({
-            'status': 'unhealthy',
-            'error': str(e)
-        }), 503
+        return jsonify({'status': 'unhealthy', 'error': str(e)}), 503
 
-@app.errorhandler(404)
-def not_found(error):
-    return jsonify({'error': 'Page not found', 'status': 404}), 404
-
-@app.errorhandler(500)
-def internal_error(error):
-    app.logger.error(f"Internal server error: {error}")
-    return jsonify({'error': 'Internal server error', 'status': 500}), 500
-
-# Initialize database on startup
 try:
     init_database()
 except Exception as e:
@@ -832,15 +590,6 @@ except Exception as e:
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
-    debug = os.environ.get('FLASK_ENV', 'production') != 'production'
-    
-    app.logger.info(f"Starting Sports Schedulers Light v1.0.0")
-    app.logger.info(f"Environment: {'development' if debug else 'production'} mode")
+    app.logger.info(f"Starting Sports Schedulers Light v1.0.0 for JES Baseball LLC")
     app.logger.info(f"Server will run on port {port}")
-    
-    app.run(
-        debug=debug,
-        host='0.0.0.0',
-        port=port,
-        threaded=True
-    )
+    app.run(debug=False, host='0.0.0.0', port=port, threaded=True)
