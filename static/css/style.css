@@ -1,0 +1,147 @@
+# 🔧 CSS MIME Type Error Fix
+
+## The Problem
+Flask is returning HTML (404 error page) instead of your CSS file, which means:
+1. The CSS file doesn't exist where Flask expects it
+2. The file path is wrong
+3. Flask isn't configured to serve static files correctly
+
+## Quick Diagnostic
+
+### Step 1: Check Your File Structure
+Make sure you have this EXACT structure:
+```
+your-project/
+├── app.py
+├── static/
+│   └── css/
+│       └── style.css    ← Must exist here!
+└── templates/
+    └── base.html
+```
+
+### Step 2: Verify CSS File Exists
+1. **Check if `static/css/style.css` exists in your project**
+2. **Check if the file has content** (not empty)
+
+## Fix Option 1: Verify File Structure
+
+**If your CSS file is missing or in wrong location:**
+
+1. **Create the file structure:**
+   ```bash
+   mkdir -p static/css
+   ```
+
+2. **Create `static/css/style.css`** with the content from my "static/css/style.css" artifact
+
+3. **Test locally:**
+   ```bash
+   python app.py
+   # Visit: http://localhost:5000/static/css/style.css
+   # Should show CSS content, not HTML error
+   ```
+
+## Fix Option 2: Update Flask Static Configuration
+
+**Add this to your `app.py` right after the Flask app creation:**
+
+```python
+import os
+from flask import Flask, render_template, request, jsonify, redirect, session, make_response, send_from_directory
+
+# Initialize Flask app
+app = Flask(__name__, static_folder='static', static_url_path='/static')
+
+# Configure static files with proper MIME types
+@app.route('/static/<path:filename>')
+def static_files(filename):
+    """Serve static files with correct MIME types"""
+    return send_from_directory('static', filename)
+```
+
+## Fix Option 3: Alternative CSS Loading
+
+**If static files keep failing, embed CSS directly in base.html temporarily:**
+
+In your `templates/base.html`, replace:
+```html
+<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+```
+
+With:
+```html
+<style>
+/* Paste the entire content of your style.css here */
+</style>
+```
+
+## Test the Fix
+
+### 1. Direct CSS Access Test
+Visit: `http://localhost:5000/static/css/style.css`
+
+**Expected:** CSS code should display
+**If you see:** HTML error page → CSS file is missing or path is wrong
+
+### 2. Application Test  
+Visit: `http://localhost:5000`
+
+**Expected:** Styled login page
+**If unstyled:** CSS still not loading
+
+## Common Causes & Solutions
+
+### Cause 1: Missing CSS File
+**Solution:** Make sure `static/css/style.css` exists with content
+
+### Cause 2: Wrong File Structure
+**Solution:** Ensure Flask can find the static folder:
+```
+app.py (same level as static folder)
+static/
+  css/
+    style.css
+```
+
+### Cause 3: Empty CSS File
+**Solution:** Make sure the CSS file has the content from my artifact
+
+### Cause 4: Flask Static Configuration
+**Solution:** Use the Flask static file route I provided above
+
+## Quick Fix Commands
+
+```bash
+# Navigate to your project directory
+cd your-project
+
+# Check if static folder exists
+ls -la static/css/
+
+# If missing, create structure
+mkdir -p static/css
+
+# Create/edit the CSS file
+# (Copy content from "static/css/style.css" artifact)
+
+# Test locally
+python app.py
+# Open: http://localhost:5000/static/css/style.css
+```
+
+## Updated app.py Import
+
+Make sure your app.py imports include:
+```python
+from flask import Flask, render_template, request, jsonify, redirect, session, make_response, send_from_directory
+```
+
+## What to Check Right Now:
+
+1. **Does `static/css/style.css` exist?**
+2. **Is it in the same directory as `app.py`?**
+3. **Does the file have content?** (not empty)
+4. **Can you access it directly?** (`http://localhost:5000/static/css/style.css`)
+
+Let me know what you find and I'll provide the specific fix! 🔧
