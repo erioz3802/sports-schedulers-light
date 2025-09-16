@@ -321,7 +321,7 @@ LOGIN_TEMPLATE = """
     <div class="login-container">
         <div class="login-header">
             <h1>Sports Schedulers</h1>
-            <p>Professional Management System</p>
+            <p>Production Management System</p>
         </div>
         {% if error %}
             <div class="alert">{{ error }}</div>
@@ -336,12 +336,7 @@ LOGIN_TEMPLATE = """
                 <input type="password" name="password" required>
             </div>
             <button type="submit" class="login-btn">Login to System</button>
-        </form>
-        <div class="test-credentials">
-            <strong>Default Login:</strong><br>
-            Username: <code>jose_1</code><br>
-            Password: <code>Josu2398-1</code>
-        </div>
+        </form>        
     </div>
 </body>
 </html>
