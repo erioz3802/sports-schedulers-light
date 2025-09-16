@@ -1,15 +1,2710 @@
-{% extends "base.html" %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sports Schedulers - Professional Management System</title>
+    
+    <!-- Bootstrap 5.3.0 CSS -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome 6.4.0 -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    
+    <style>
+        :root {
+            --primary-blue: #1e40af;
+            --secondary-blue: #3b82f6;
+            --success-green: #10b981;
+            --warning-yellow: #f59e0b;
+            --danger-red: #ef4444;
+            --dark-bg: #1f2937;
+            --light-bg: #f8fafc;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background-color: var(--light-bg);
+            color: #1f2937;
+        }
+        
+        .sidebar {
+            background: linear-gradient(135deg, var(--primary-blue) 0%, var(--secondary-blue) 100%);
+            min-height: 100vh;
+            width: 250px;
+            position: fixed;
+            top: 0;
+            left: 0;
+            z-index: 1000;
+            transition: transform 0.3s ease;
+        }
+        
+        .sidebar-brand {
+            padding: 1.5rem;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        .sidebar-brand h4 {
+            color: white;
+            margin: 0;
+            font-weight: 600;
+        }
+        
+        .sidebar-nav {
+            padding: 0;
+            list-style: none;
+        }
+        
+        .nav-link {
+            display: block;
+            padding: 0.75rem 1.5rem;
+            color: rgba(255,255,255,0.8);
+            text-decoration: none;
+            transition: all 0.2s ease;
+            border-left: 3px solid transparent;
+        }
+        
+        .nav-link:hover, .nav-link.active {
+            color: white;
+            background-color: rgba(255,255,255,0.1);
+            border-left-color: white;
+        }
+        
+        .nav-link i {
+            width: 20px;
+            margin-right: 10px;
+        }
+        
+        .main-content {
+            margin-left: 250px;
+            min-height: 100vh;
+            background-color: var(--light-bg);
+        }
+        
+        .topbar {
+            background: white;
+            padding: 1rem 2rem;
+            border-bottom: 1px solid #e5e7eb;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        
+        .content-area {
+            padding: 2rem;
+        }
+        
+        .card {
+            background: white;
+            border: none;
+            border-radius: 12px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            transition: box-shadow 0.2s ease;
+        }
+        
+        .card:hover {
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        
+        .card-header {
+            background: transparent;
+            border-bottom: 1px solid #e5e7eb;
+            padding: 1.25rem;
+            font-weight: 600;
+        }
+        
+        .stats-card {
+            background: linear-gradient(135deg, var(--secondary-blue) 0%, var(--primary-blue) 100%);
+            color: white;
+            border: none;
+        }
+        
+        .stats-card .card-body {
+            padding: 1.5rem;
+        }
+        
+        .stats-number {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+        
+        .btn-primary {
+            background: var(--secondary-blue);
+            border-color: var(--secondary-blue);
+            border-radius: 8px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+        
+        .btn-primary:hover {
+            background: var(--primary-blue);
+            border-color: var(--primary-blue);
+            transform: translateY(-1px);
+        }
+        
+        .btn-success {
+            background: var(--success-green);
+            border-color: var(--success-green);
+        }
+        
+        .btn-warning {
+            background: var(--warning-yellow);
+            border-color: var(--warning-yellow);
+        }
+        
+        .btn-danger {
+            background: var(--danger-red);
+            border-color: var(--danger-red);
+        }
+        
+        .table {
+            background: white;
+        }
+        
+        .table th {
+            background-color: #f8fafc;
+            border-top: none;
+            font-weight: 600;
+            color: #374151;
+        }
+        
+        .badge {
+            font-size: 0.75rem;
+            padding: 0.375rem 0.75rem;
+            border-radius: 6px;
+        }
+        
+        .modal-header {
+            background: var(--secondary-blue);
+            color: white;
+            border-radius: 12px 12px 0 0;
+        }
+        
+        .modal-content {
+            border: none;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+        }
+        
+        .form-control, .form-select {
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            transition: border-color 0.2s ease;
+        }
+        
+        .form-control:focus, .form-select:focus {
+            border-color: var(--secondary-blue);
+            box-shadow: 0 0 0 0.2rem rgba(59,130,246,0.25);
+        }
+        
+        .toast-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 9999;
+        }
+        
+        .toast {
+            background: white;
+            border: none;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            min-width: 300px;
+        }
+        
+        .toast-success {
+            border-left: 4px solid var(--success-green);
+        }
+        
+        .toast-error {
+            border-left: 4px solid var(--danger-red);
+        }
+        
+        .toast-warning {
+            border-left: 4px solid var(--warning-yellow);
+        }
+        
+        .loading-spinner {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 9999;
+        }
+        
+        .section-header {
+            margin-bottom: 2rem;
+        }
+        
+        .section-header h2 {
+            margin-bottom: 0.5rem;
+            color: var(--primary-blue);
+            font-weight: 600;
+        }
+        
+        .section-header p {
+            color: #6b7280;
+            margin: 0;
+        }
+        
+        .action-buttons {
+            display: flex;
+            gap: 0.5rem;
+        }
+        
+        .action-buttons .btn {
+            padding: 0.375rem 0.75rem;
+            font-size: 0.875rem;
+        }
+        
+        .search-filters {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 12px;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        
+        .filter-row {
+            display: flex;
+            gap: 1rem;
+            align-items: end;
+        }
+        
+        .filter-group {
+            flex: 1;
+        }
+        
+        @media (max-width: 768px) {
+            .sidebar {
+                transform: translateX(-100%);
+            }
+            
+            .sidebar.show {
+                transform: translateX(0);
+            }
+            
+            .main-content {
+                margin-left: 0;
+            }
+            
+            .filter-row {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            .action-buttons {
+                flex-direction: column;
+            }
+        }
+        
+        .user-dropdown {
+            position: relative;
+        }
+        
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            cursor: pointer;
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            transition: background-color 0.2s ease;
+        }
+        
+        .user-info:hover {
+            background-color: #f3f4f6;
+        }
+        
+        .user-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: var(--secondary-blue);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 600;
+        }
+        
+        .hidden {
+            display: none !important;
+        }
+    </style>
+</head>
+<body>
+    <!-- Sidebar Navigation -->
+    <nav class="sidebar">
+        <div class="sidebar-brand">
+            <h4><i class="fas fa-calendar-alt me-2"></i>Sports Schedulers</h4>
+            <small class="text-white-50">Professional Management</small>
+        </div>
+        <ul class="sidebar-nav">
+            <li><a href="#" class="nav-link active" onclick="showSection('dashboard')">
+                <i class="fas fa-tachometer-alt"></i>Dashboard
+            </a></li>
+            <li><a href="#" class="nav-link" onclick="showSection('games')">
+                <i class="fas fa-gamepad"></i>Games
+            </a></li>
+            <li><a href="#" class="nav-link" onclick="showSection('officials')">
+                <i class="fas fa-user-tie"></i>Officials
+            </a></li>
+            <li><a href="#" class="nav-link" onclick="showSection('assignments')">
+                <i class="fas fa-clipboard-list"></i>Assignments
+            </a></li>
+            <li><a href="#" class="nav-link" onclick="showSection('locations')">
+                <i class="fas fa-map-marker-alt"></i>Locations
+            </a></li>
+            <li><a href="#" class="nav-link" onclick="showSection('users')">
+                <i class="fas fa-users"></i>Users
+            </a></li>
+            <li><a href="#" class="nav-link" onclick="showSection('reports')">
+                <i class="fas fa-chart-bar"></i>Reports
+            </a></li>
+        </ul>
+        
+        <div class="position-absolute bottom-0 w-100 p-3">
+            <div class="text-center">
+                <small class="text-white-50">© 2025 Jose Ortiz<br>JES Baseball LLC</small>
+            </div>
+        </div>
+    </nav>
 
-{% block title %}Sports Schedulers - Dashboard{% endblock %}
+    <!-- Main Content Area -->
+    <main class="main-content">
+        <!-- Top Navigation Bar -->
+        <div class="topbar d-flex justify-content-between align-items-center">
+            <div>
+                <button class="btn btn-outline-secondary d-md-none me-3" onclick="toggleSidebar()">
+                    <i class="fas fa-bars"></i>
+                </button>
+                <h1 class="h3 m-0" id="pageTitle">Dashboard</h1>
+            </div>
+            <div class="user-dropdown">
+                <div class="user-info">
+                    <div class="user-avatar">
+                        {{ session.get('full_name', 'User')[0].upper() }}
+                    </div>
+                    <div>
+                        <div class="fw-semibold">{{ session.get('full_name', 'User') }}</div>
+                        <small class="text-muted">{{ session.get('role', 'user').title() }}</small>
+                    </div>
+                    <div class="dropdown">
+                        <button class="btn btn-link text-decoration-none p-0" data-bs-toggle="dropdown">
+                            <i class="fas fa-chevron-down text-muted"></i>
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><a class="dropdown-item" href="#"><i class="fas fa-user me-2"></i>Profile</a></li>
+                            <li><a class="dropdown-item" href="#"><i class="fas fa-cog me-2"></i>Settings</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="/logout"><i class="fas fa-sign-out-alt me-2"></i>Logout</a></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
 
-{% block content %}
-<!-- This will be populated by JavaScript -->
-<div id="main-content">
-    <div class="flex justify-center items-center h-64">
-        <div class="loading show items-center">
-            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mr-3"></div>
-            <span class="text-gray-600">Loading application...</span>
+        <!-- Content Area -->
+        <div class="content-area">
+            <!-- Dashboard Section -->
+            <div id="dashboard-section" class="content-section">
+                <div class="section-header">
+                    <h2>Dashboard Overview</h2>
+                    <p>Welcome back, {{ session.get('full_name', 'User') }}! Here's what's happening today.</p>
+                </div>
+
+                <!-- Statistics Cards -->
+                <div class="row g-4 mb-4">
+                    <div class="col-md-3">
+                        <div class="card stats-card">
+                            <div class="card-body text-center">
+                                <i class="fas fa-gamepad fa-2x mb-3"></i>
+                                <div class="stats-number" id="total-games">0</div>
+                                <div>Total Games</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card stats-card">
+                            <div class="card-body text-center">
+                                <i class="fas fa-user-tie fa-2x mb-3"></i>
+                                <div class="stats-number" id="total-officials">0</div>
+                                <div>Active Officials</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card stats-card">
+                            <div class="card-body text-center">
+                                <i class="fas fa-clipboard-list fa-2x mb-3"></i>
+                                <div class="stats-number" id="total-assignments">0</div>
+                                <div>Assignments</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card stats-card">
+                            <div class="card-body text-center">
+                                <i class="fas fa-clock fa-2x mb-3"></i>
+                                <div class="stats-number" id="pending-assignments">0</div>
+                                <div>Pending</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Recent Activity -->
+                <div class="row g-4">
+                    <div class="col-lg-8">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="mb-0"><i class="fas fa-clock me-2"></i>Recent Activity</h5>
+                            </div>
+                            <div class="card-body">
+                                <div id="recent-activity-list">
+                                    <div class="text-center text-muted">Loading activity...</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-lg-4">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="mb-0"><i class="fas fa-chart-pie me-2"></i>Games by Sport</h5>
+                            </div>
+                            <div class="card-body">
+                                <div id="games-by-sport-chart">
+                                    <div class="text-center text-muted">Loading chart...</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Games Section -->
+            <div id="games-section" class="content-section hidden">
+                <div class="section-header d-flex justify-content-between align-items-center">
+                    <div>
+                        <h2>Games Management</h2>
+                        <p>Manage all scheduled games and events</p>
+                    </div>
+                    <button class="btn btn-primary" onclick="openCreateModal('game')">
+                        <i class="fas fa-plus me-2"></i>Add Game
+                    </button>
+                </div>
+
+                <!-- Search and Filters -->
+                <div class="search-filters">
+                    <div class="filter-row">
+                        <div class="filter-group">
+                            <label class="form-label">Date From</label>
+                            <input type="date" class="form-control" id="games-date-from">
+                        </div>
+                        <div class="filter-group">
+                            <label class="form-label">Date To</label>
+                            <input type="date" class="form-control" id="games-date-to">
+                        </div>
+                        <div class="filter-group">
+                            <label class="form-label">Sport</label>
+                            <select class="form-select" id="games-sport-filter">
+                                <option value="">All Sports</option>
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <label class="form-label">League</label>
+                            <select class="form-select" id="games-league-filter">
+                                <option value="">All Leagues</option>
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <label class="form-label">&nbsp;</label>
+                            <button class="btn btn-secondary w-100" onclick="applyGamesFilter()">
+                                <i class="fas fa-search me-2"></i>Filter
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Games Table -->
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0"><i class="fas fa-gamepad me-2"></i>Games List</h5>
+                        <button class="btn btn-outline-success btn-sm" onclick="exportData('games')">
+                            <i class="fas fa-download me-2"></i>Export CSV
+                        </button>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Date</th>
+                                        <th>Time</th>
+                                        <th>Teams</th>
+                                        <th>Location</th>
+                                        <th>Sport</th>
+                                        <th>Officials Needed</th>
+                                        <th>Status</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="games-table-body">
+                                    <tr>
+                                        <td colspan="8" class="text-center text-muted">Loading games...</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Officials Section -->
+            <div id="officials-section" class="content-section hidden">
+                <div class="section-header d-flex justify-content-between align-items-center">
+                    <div>
+                        <h2>Officials Management</h2>
+                        <p>Manage referee and umpire profiles</p>
+                    </div>
+                    <button class="btn btn-primary" onclick="openCreateModal('official')">
+                        <i class="fas fa-plus me-2"></i>Add Official
+                    </button>
+                </div>
+
+                <!-- Search and Filters -->
+                <div class="search-filters">
+                    <div class="filter-row">
+                        <div class="filter-group">
+                            <label class="form-label">Search Officials</label>
+                            <input type="text" class="form-control" id="officials-search" placeholder="Search by name or email...">
+                        </div>
+                        <div class="filter-group">
+                            <label class="form-label">Experience Level</label>
+                            <select class="form-select" id="officials-experience-filter">
+                                <option value="">All Levels</option>
+                                <option value="Beginner">Beginner</option>
+                                <option value="Intermediate">Intermediate</option>
+                                <option value="Advanced">Advanced</option>
+                                <option value="Expert">Expert</option>
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <label class="form-label">&nbsp;</label>
+                            <button class="btn btn-secondary w-100" onclick="applyOfficialsFilter()">
+                                <i class="fas fa-search me-2"></i>Filter
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Officials Table -->
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0"><i class="fas fa-user-tie me-2"></i>Officials List</h5>
+                        <button class="btn btn-outline-success btn-sm" onclick="exportData('officials')">
+                            <i class="fas fa-download me-2"></i>Export CSV
+                        </button>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Name</th>
+                                        <th>Email</th>
+                                        <th>Phone</th>
+                                        <th>Experience</th>
+                                        <th>Rating</th>
+                                        <th>Assignments</th>
+                                        <th>Status</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="officials-table-body">
+                                    <tr>
+                                        <td colspan="8" class="text-center text-muted">Loading officials...</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Assignments Section -->
+            <div id="assignments-section" class="content-section hidden">
+                <div class="section-header d-flex justify-content-between align-items-center">
+                    <div>
+                        <h2>Assignments Management</h2>
+                        <p>Assign officials to games and track status</p>
+                    </div>
+                    <button class="btn btn-primary" onclick="openCreateModal('assignment')">
+                        <i class="fas fa-plus me-2"></i>Create Assignment
+                    </button>
+                </div>
+
+                <!-- Search and Filters -->
+                <div class="search-filters">
+                    <div class="filter-row">
+                        <div class="filter-group">
+                            <label class="form-label">Status</label>
+                            <select class="form-select" id="assignments-status-filter">
+                                <option value="">All Statuses</option>
+                                <option value="pending">Pending</option>
+                                <option value="confirmed">Confirmed</option>
+                                <option value="declined">Declined</option>
+                                <option value="completed">Completed</option>
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <label class="form-label">Date From</label>
+                            <input type="date" class="form-control" id="assignments-date-from">
+                        </div>
+                        <div class="filter-group">
+                            <label class="form-label">Date To</label>
+                            <input type="date" class="form-control" id="assignments-date-to">
+                        </div>
+                        <div class="filter-group">
+                            <label class="form-label">&nbsp;</label>
+                            <button class="btn btn-secondary w-100" onclick="applyAssignmentsFilter()">
+                                <i class="fas fa-search me-2"></i>Filter
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Assignments Table -->
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0"><i class="fas fa-clipboard-list me-2"></i>Assignments List</h5>
+                        <button class="btn btn-outline-success btn-sm" onclick="exportData('assignments')">
+                            <i class="fas fa-download me-2"></i>Export CSV
+                        </button>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Game Date</th>
+                                        <th>Teams</th>
+                                        <th>Official</th>
+                                        <th>Position</th>
+                                        <th>Status</th>
+                                        <th>Assigned Date</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="assignments-table-body">
+                                    <tr>
+                                        <td colspan="7" class="text-center text-muted">Loading assignments...</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Locations Section -->
+            <div id="locations-section" class="content-section hidden">
+                <div class="section-header d-flex justify-content-between align-items-center">
+                    <div>
+                        <h2>Locations Management</h2>
+                        <p>Manage venues and game locations</p>
+                    </div>
+                    <button class="btn btn-primary" onclick="openCreateModal('location')">
+                        <i class="fas fa-plus me-2"></i>Add Location
+                    </button>
+                </div>
+
+                <!-- Search and Filters -->
+                <div class="search-filters">
+                    <div class="filter-row">
+                        <div class="filter-group">
+                            <label class="form-label">Search Locations</label>
+                            <input type="text" class="form-control" id="locations-search" placeholder="Search by name, city, or state...">
+                        </div>
+                        <div class="filter-group">
+                            <label class="form-label">&nbsp;</label>
+                            <button class="btn btn-secondary w-100" onclick="applyLocationsFilter()">
+                                <i class="fas fa-search me-2"></i>Filter
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Locations Table -->
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="fas fa-map-marker-alt me-2"></i>Locations List</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Name</th>
+                                        <th>Address</th>
+                                        <th>City</th>
+                                        <th>State</th>
+                                        <th>Capacity</th>
+                                        <th>Contact</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="locations-table-body">
+                                    <tr>
+                                        <td colspan="7" class="text-center text-muted">Loading locations...</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Users Section -->
+            <div id="users-section" class="content-section hidden">
+                <div class="section-header d-flex justify-content-between align-items-center">
+                    <div>
+                        <h2>Users Management</h2>
+                        <p>Manage system users and permissions</p>
+                    </div>
+                    {% if session.get('role') in ['admin', 'superadmin'] %}
+                    <button class="btn btn-primary" onclick="openCreateModal('user')">
+                        <i class="fas fa-plus me-2"></i>Add User
+                    </button>
+                    {% endif %}
+                </div>
+
+                <!-- Search and Filters -->
+                <div class="search-filters">
+                    <div class="filter-row">
+                        <div class="filter-group">
+                            <label class="form-label">Search Users</label>
+                            <input type="text" class="form-control" id="users-search" placeholder="Search by username, name, or email...">
+                        </div>
+                        <div class="filter-group">
+                            <label class="form-label">Role</label>
+                            <select class="form-select" id="users-role-filter">
+                                <option value="">All Roles</option>
+                                <option value="user">User</option>
+                                <option value="official">Official</option>
+                                <option value="admin">Admin</option>
+                                <option value="superadmin">Super Admin</option>
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <label class="form-label">&nbsp;</label>
+                            <button class="btn btn-secondary w-100" onclick="applyUsersFilter()">
+                                <i class="fas fa-search me-2"></i>Filter
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Users Table -->
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="fas fa-users me-2"></i>Users List</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Username</th>
+                                        <th>Full Name</th>
+                                        <th>Email</th>
+                                        <th>Role</th>
+                                        <th>Status</th>
+                                        <th>Last Login</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="users-table-body">
+                                    <tr>
+                                        <td colspan="7" class="text-center text-muted">Loading users...</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Reports Section -->
+            <div id="reports-section" class="content-section hidden">
+                <div class="section-header">
+                    <h2>Reports & Analytics</h2>
+                    <p>View detailed reports and export data</p>
+                </div>
+
+                <!-- Report Cards -->
+                <div class="row g-4 mb-4">
+                    <div class="col-md-4">
+                        <div class="card">
+                            <div class="card-body text-center">
+                                <i class="fas fa-chart-line fa-3x text-primary mb-3"></i>
+                                <h5>Game Statistics</h5>
+                                <p class="text-muted">Comprehensive game analytics and trends</p>
+                                <button class="btn btn-primary" onclick="generateReport('games')">View Report</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card">
+                            <div class="card-body text-center">
+                                <i class="fas fa-users fa-3x text-success mb-3"></i>
+                                <h5>Officials Performance</h5>
+                                <p class="text-muted">Official ratings and assignment history</p>
+                                <button class="btn btn-success" onclick="generateReport('officials')">View Report</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card">
+                            <div class="card-body text-center">
+                                <i class="fas fa-clipboard-list fa-3x text-warning mb-3"></i>
+                                <h5>Assignment Analytics</h5>
+                                <p class="text-muted">Assignment patterns and efficiency</p>
+                                <button class="btn btn-warning" onclick="generateReport('assignments')">View Report</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Detailed Reports -->
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="fas fa-chart-bar me-2"></i>System Analytics</h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="reports-content">
+                            <div class="text-center text-muted">Select a report above to view detailed analytics</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- CREATE MODALS - Phase 4 CRUD Implementation -->
+    
+    <!-- Create Game Modal -->
+    <div class="modal fade" id="createGameModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="fas fa-plus me-2"></i>Add New Game</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="createGameForm">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Date *</label>
+                                <input type="date" class="form-control" name="date" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Time *</label>
+                                <input type="time" class="form-control" name="time" required>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Home Team *</label>
+                                <input type="text" class="form-control" name="home_team" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Away Team *</label>
+                                <input type="text" class="form-control" name="away_team" required>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Location *</label>
+                                <select class="form-select" name="location" required>
+                                    <option value="">Select Location</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Sport *</label>
+                                <select class="form-select" name="sport" required>
+                                    <option value="">Select Sport</option>
+                                    <option value="Baseball">Baseball</option>
+                                    <option value="Basketball">Basketball</option>
+                                    <option value="Football">Football</option>
+                                    <option value="Soccer">Soccer</option>
+                                    <option value="Softball">Softball</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">League</label>
+                                <input type="text" class="form-control" name="league" placeholder="e.g., Youth League">
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">Level</label>
+                                <input type="text" class="form-control" name="level" placeholder="e.g., U12, Varsity">
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">Officials Needed</label>
+                                <input type="number" class="form-control" name="officials_needed" value="1" min="1" max="10">
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Notes</label>
+                            <textarea class="form-control" name="notes" rows="3" placeholder="Additional game notes..."></textarea>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" onclick="createGame()">Save Game</button>
+                </div>
+            </div>
         </div>
     </div>
-</div>
-{% endblock %}
+
+    <!-- Create Official Modal -->
+    <div class="modal fade" id="createOfficialModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="fas fa-plus me-2"></i>Add New Official</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="createOfficialForm">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Name *</label>
+                                <input type="text" class="form-control" name="name" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Email *</label>
+                                <input type="email" class="form-control" name="email" required>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Phone</label>
+                                <input type="tel" class="form-control" name="phone">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Experience Level</label>
+                                <select class="form-select" name="experience_level">
+                                    <option value="Beginner">Beginner</option>
+                                    <option value="Intermediate">Intermediate</option>
+                                    <option value="Advanced">Advanced</option>
+                                    <option value="Expert">Expert</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Certifications</label>
+                                <input type="text" class="form-control" name="certifications" placeholder="e.g., NFHS Certified">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Rating</label>
+                                <input type="number" class="form-control" name="rating" min="0" max="5" step="0.1" value="0">
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Availability</label>
+                            <select class="form-select" name="availability">
+                                <option value="Flexible">Flexible</option>
+                                <option value="Weekends Only">Weekends Only</option>
+                                <option value="Evenings">Evenings</option>
+                                <option value="Limited">Limited</option>
+                            </select>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" onclick="createOfficial()">Save Official</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Create Assignment Modal -->
+    <div class="modal fade" id="createAssignmentModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="fas fa-plus me-2"></i>Create Assignment</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="createAssignmentForm">
+                        <div class="mb-3">
+                            <label class="form-label">Game *</label>
+                            <select class="form-select" name="game_id" required>
+                                <option value="">Select Game</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Official *</label>
+                            <select class="form-select" name="official_id" required>
+                                <option value="">Select Official</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Position</label>
+                            <select class="form-select" name="position">
+                                <option value="Official">Official</option>
+                                <option value="Referee">Referee</option>
+                                <option value="Umpire">Umpire</option>
+                                <option value="Crew Chief">Crew Chief</option>
+                                <option value="Line Judge">Line Judge</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Status</label>
+                            <select class="form-select" name="status">
+                                <option value="pending">Pending</option>
+                                <option value="confirmed">Confirmed</option>
+                                <option value="declined">Declined</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Notes</label>
+                            <textarea class="form-control" name="notes" rows="2" placeholder="Optional notes about this assignment"></textarea>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" onclick="createAssignment()">Create Assignment</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Create User Modal -->
+    <div class="modal fade" id="createUserModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="fas fa-plus me-2"></i>Add New User</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="createUserForm">
+                        <div class="mb-3">
+                            <label class="form-label">Username *</label>
+                            <input type="text" class="form-control" name="username" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Full Name *</label>
+                            <input type="text" class="form-control" name="full_name" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Email *</label>
+                            <input type="email" class="form-control" name="email" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Phone</label>
+                            <input type="tel" class="form-control" name="phone">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Password *</label>
+                            <input type="password" class="form-control" name="password" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Role *</label>
+                            <select class="form-select" name="role" required>
+                                <option value="">Select Role</option>
+                                <option value="user">User</option>
+                                <option value="official">Official</option>
+                                {% if session.get('role') == 'superadmin' %}
+                                <option value="admin">Admin</option>
+                                <option value="superadmin">Super Admin</option>
+                                {% endif %}
+                            </select>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" onclick="createUser()">Save User</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Create Location Modal -->
+    <div class="modal fade" id="createLocationModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="fas fa-plus me-2"></i>Add New Location</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="createLocationForm">
+                        <div class="mb-3">
+                            <label class="form-label">Location Name *</label>
+                            <input type="text" class="form-control" name="name" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Address</label>
+                            <input type="text" class="form-control" name="address">
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">City</label>
+                                <input type="text" class="form-control" name="city">
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <label class="form-label">State</label>
+                                <input type="text" class="form-control" name="state" maxlength="2">
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <label class="form-label">ZIP Code</label>
+                                <input type="text" class="form-control" name="zip_code" maxlength="10">
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Contact Person</label>
+                                <input type="text" class="form-control" name="contact_person">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Contact Phone</label>
+                                <input type="tel" class="form-control" name="phone">
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Contact Email</label>
+                                <input type="email" class="form-control" name="email">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Capacity</label>
+                                <input type="number" class="form-control" name="capacity" min="0">
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Notes</label>
+                            <textarea class="form-control" name="notes" rows="3" placeholder="Additional location information..."></textarea>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" onclick="createLocation()">Save Location</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- EDIT MODAL - Universal Edit Modal -->
+    <div class="modal fade" id="editModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="editModalTitle"><i class="fas fa-edit me-2"></i>Edit Item</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" id="editModalBody">
+                    <!-- Dynamic content will be inserted here -->
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" onclick="saveEdit()">Save Changes</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Container for Notifications -->
+    <div class="toast-container"></div>
+
+    <!-- Loading Spinner -->
+    <div class="loading-spinner">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+    </div>
+
+    <!-- Bootstrap 5.3.0 JS -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
+
+    <script>
+        // Global Variables
+        let currentEditId = null;
+        let currentEditType = null;
+        let currentSection = 'dashboard';
+        let dropdownData = {};
+
+        // Initialize Application
+        document.addEventListener('DOMContentLoaded', function() {
+            loadDropdownData();
+            loadDashboard();
+            setInterval(refreshCurrentSection, 30000); // Refresh every 30 seconds
+        });
+
+        // ======================================
+        // UTILITY FUNCTIONS
+        // ======================================
+
+        function showLoading(show = true) {
+            const spinner = document.querySelector('.loading-spinner');
+            spinner.style.display = show ? 'block' : 'none';
+        }
+
+        function showNotification(message, type = 'success') {
+            const container = document.querySelector('.toast-container');
+            const toastId = 'toast-' + Date.now();
+            
+            const toast = document.createElement('div');
+            toast.id = toastId;
+            toast.className = `toast toast-${type} show`;
+            toast.setAttribute('role', 'alert');
+            
+            toast.innerHTML = `
+                <div class="toast-body d-flex align-items-center">
+                    <i class="fas fa-${type === 'success' ? 'check-circle' : type === 'error' ? 'exclamation-circle' : 'info-circle'} me-2"></i>
+                    <span class="flex-grow-1">${message}</span>
+                    <button type="button" class="btn-close" data-bs-dismiss="toast"></button>
+                </div>
+            `;
+            
+            container.appendChild(toast);
+            
+            // Auto remove after 5 seconds
+            setTimeout(() => {
+                if (document.getElementById(toastId)) {
+                    const bsToast = new bootstrap.Toast(document.getElementById(toastId));
+                    bsToast.hide();
+                    setTimeout(() => toast.remove(), 500);
+                }
+            }, 5000);
+        }
+
+        function formatDate(dateString) {
+            return new Date(dateString).toLocaleDateString();
+        }
+
+        function formatDateTime(dateString) {
+            return new Date(dateString).toLocaleString();
+        }
+
+        function getStatusBadge(status) {
+            const statusClasses = {
+                'scheduled': 'bg-primary',
+                'pending': 'bg-warning',
+                'confirmed': 'bg-success',
+                'declined': 'bg-danger',
+                'completed': 'bg-secondary',
+                'active': 'bg-success',
+                'inactive': 'bg-secondary'
+            };
+            
+            const className = statusClasses[status] || 'bg-secondary';
+            return `<span class="badge ${className}">${status.charAt(0).toUpperCase() + status.slice(1)}</span>`;
+        }
+
+        // ======================================
+        // NAVIGATION FUNCTIONS
+        // ======================================
+
+        function showSection(sectionName) {
+            // Hide all sections
+            document.querySelectorAll('.content-section').forEach(section => {
+                section.classList.add('hidden');
+            });
+            
+            // Show selected section
+            document.getElementById(sectionName + '-section').classList.remove('hidden');
+            
+            // Update navigation
+            document.querySelectorAll('.nav-link').forEach(link => {
+                link.classList.remove('active');
+            });
+            
+            document.querySelector(`[onclick="showSection('${sectionName}')"]`).classList.add('active');
+            
+            // Update page title
+            const titles = {
+                'dashboard': 'Dashboard',
+                'games': 'Games Management', 
+                'officials': 'Officials Management',
+                'assignments': 'Assignments Management',
+                'locations': 'Locations Management',
+                'users': 'Users Management',
+                'reports': 'Reports & Analytics'
+            };
+            
+            document.getElementById('pageTitle').textContent = titles[sectionName];
+            currentSection = sectionName;
+            
+            // Load section data
+            switch(sectionName) {
+                case 'dashboard':
+                    loadDashboard();
+                    break;
+                case 'games':
+                    loadGames();
+                    break;
+                case 'officials':
+                    loadOfficials();
+                    break;
+                case 'assignments':
+                    loadAssignments();
+                    break;
+                case 'locations':
+                    loadLocations();
+                    break;
+                case 'users':
+                    loadUsers();
+                    break;
+                case 'reports':
+                    loadReports();
+                    break;
+            }
+        }
+
+        function toggleSidebar() {
+            document.querySelector('.sidebar').classList.toggle('show');
+        }
+
+        function refreshCurrentSection() {
+            showSection(currentSection);
+        }
+
+        // ======================================
+        // DATA LOADING FUNCTIONS
+        // ======================================
+
+        async function loadDropdownData() {
+            try {
+                const response = await fetch('/api/dropdown-data');
+                const data = await response.json();
+                
+                if (data.success) {
+                    dropdownData = data.data;
+                    populateDropdowns();
+                }
+            } catch (error) {
+                console.error('Error loading dropdown data:', error);
+            }
+        }
+
+        function populateDropdowns() {
+            // Populate sports dropdown
+            const sportSelects = document.querySelectorAll('select[name="sport"]');
+            sportSelects.forEach(select => {
+                if (dropdownData.sports) {
+                    dropdownData.sports.forEach(sport => {
+                        const option = document.createElement('option');
+                        option.value = sport;
+                        option.textContent = sport;
+                        select.appendChild(option);
+                    });
+                }
+            });
+
+            // Populate locations dropdown
+            const locationSelects = document.querySelectorAll('select[name="location"]');
+            locationSelects.forEach(select => {
+                if (dropdownData.locations) {
+                    dropdownData.locations.forEach(location => {
+                        const option = document.createElement('option');
+                        option.value = location.name;
+                        option.textContent = location.name;
+                        select.appendChild(option);
+                    });
+                }
+            });
+
+            // Populate officials dropdown for assignments
+            const officialSelects = document.querySelectorAll('select[name="official_id"]');
+            officialSelects.forEach(select => {
+                if (dropdownData.officials) {
+                    dropdownData.officials.forEach(official => {
+                        const option = document.createElement('option');
+                        option.value = official.id;
+                        option.textContent = official.name;
+                        select.appendChild(option);
+                    });
+                }
+            });
+
+            // Populate games dropdown for assignments
+            loadGamesForAssignment();
+        }
+
+        async function loadGamesForAssignment() {
+            try {
+                const response = await fetch('/api/games');
+                const data = await response.json();
+                
+                if (data.success) {
+                    const gameSelects = document.querySelectorAll('select[name="game_id"]');
+                    gameSelects.forEach(select => {
+                        // Clear existing options except first
+                        while (select.children.length > 1) {
+                            select.removeChild(select.lastChild);
+                        }
+                        
+                        data.games.forEach(game => {
+                            const option = document.createElement('option');
+                            option.value = game.id;
+                            option.textContent = `${game.date} ${game.time} - ${game.home_team} vs ${game.away_team}`;
+                            select.appendChild(option);
+                        });
+                    });
+                }
+            } catch (error) {
+                console.error('Error loading games for assignment:', error);
+            }
+        }
+
+        async function loadDashboard() {
+            try {
+                const response = await fetch('/api/dashboard');
+                const data = await response.json();
+                
+                if (data.success) {
+                    const stats = data.stats;
+                    
+                    // Update statistics cards
+                    document.getElementById('total-games').textContent = stats.total_games || 0;
+                    document.getElementById('total-officials').textContent = stats.total_officials || 0;
+                    document.getElementById('total-assignments').textContent = stats.total_assignments || 0;
+                    document.getElementById('pending-assignments').textContent = stats.pending_assignments || 0;
+                    
+                    // Update recent activity
+                    updateRecentActivity(stats.recent_activity || []);
+                    
+                    // Update games by sport chart
+                    updateGamesBySport(stats.games_by_sport || []);
+                }
+            } catch (error) {
+                console.error('Error loading dashboard:', error);
+                showNotification('Failed to load dashboard data', 'error');
+            }
+        }
+
+        function updateRecentActivity(activities) {
+            const container = document.getElementById('recent-activity-list');
+            
+            if (activities.length === 0) {
+                container.innerHTML = '<div class="text-center text-muted">No recent activity</div>';
+                return;
+            }
+            
+            container.innerHTML = activities.map(activity => `
+                <div class="d-flex align-items-center mb-3">
+                    <div class="flex-shrink-0">
+                        <i class="fas fa-${getActivityIcon(activity.action)} text-primary"></i>
+                    </div>
+                    <div class="flex-grow-1 ms-3">
+                        <div class="fw-semibold">${activity.action.replace('_', ' ')}</div>
+                        <small class="text-muted">by ${activity.full_name || 'System'} • ${formatDateTime(activity.timestamp)}</small>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function getActivityIcon(action) {
+            const icons = {
+                'LOGIN': 'sign-in-alt',
+                'LOGOUT': 'sign-out-alt',
+                'CREATE_GAME': 'plus-circle',
+                'CREATE_OFFICIAL': 'user-plus',
+                'CREATE_ASSIGNMENT': 'clipboard-list',
+                'CREATE_USER': 'user-plus',
+                'CREATE_LOCATION': 'map-marker-alt',
+                'UPDATE_GAME': 'edit',
+                'UPDATE_OFFICIAL': 'edit',
+                'UPDATE_ASSIGNMENT': 'edit',
+                'DELETE_GAME': 'trash',
+                'DELETE_OFFICIAL': 'trash',
+                'EXPORT_GAMES': 'download',
+                'EXPORT_OFFICIALS': 'download'
+            };
+            return icons[action] || 'info-circle';
+        }
+
+        function updateGamesBySport(gamesBySport) {
+            const container = document.getElementById('games-by-sport-chart');
+            
+            if (gamesBySport.length === 0) {
+                container.innerHTML = '<div class="text-center text-muted">No games data</div>';
+                return;
+            }
+            
+            container.innerHTML = gamesBySport.map(sport => `
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span>${sport.sport}</span>
+                    <div>
+                        <span class="badge bg-primary">${sport.count}</span>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // ======================================
+        // GAMES MANAGEMENT
+        // ======================================
+
+        async function loadGames() {
+            try {
+                showLoading(true);
+                const response = await fetch('/api/games');
+                const data = await response.json();
+                
+                if (data.success) {
+                    updateGamesTable(data.games);
+                } else {
+                    showNotification('Failed to load games', 'error');
+                }
+            } catch (error) {
+                console.error('Error loading games:', error);
+                showNotification('Error loading games', 'error');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        function updateGamesTable(games) {
+            const tbody = document.getElementById('games-table-body');
+            
+            if (games.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted">No games found</td></tr>';
+                return;
+            }
+            
+            tbody.innerHTML = games.map(game => `
+                <tr>
+                    <td>${formatDate(game.date)}</td>
+                    <td>${game.time}</td>
+                    <td>
+                        <div><strong>${game.home_team}</strong> vs <strong>${game.away_team}</strong></div>
+                        ${game.league ? `<small class="text-muted">${game.league} - ${game.level || ''}</small>` : ''}
+                    </td>
+                    <td>${game.location}</td>
+                    <td><span class="badge bg-secondary">${game.sport}</span></td>
+                    <td>${game.officials_needed || 1}</td>
+                    <td>${getStatusBadge(game.status || 'scheduled')}</td>
+                    <td>
+                        <div class="action-buttons">
+                            <button class="btn btn-outline-primary btn-sm" onclick="editItem(${game.id}, 'game')" title="Edit">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button class="btn btn-outline-danger btn-sm" onclick="deleteItem(${game.id}, 'game')" title="Delete">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        async function applyGamesFilter() {
+            const dateFrom = document.getElementById('games-date-from').value;
+            const dateTo = document.getElementById('games-date-to').value;
+            const sport = document.getElementById('games-sport-filter').value;
+            const league = document.getElementById('games-league-filter').value;
+            
+            const params = new URLSearchParams();
+            if (dateFrom) params.append('date_from', dateFrom);
+            if (dateTo) params.append('date_to', dateTo);
+            if (sport) params.append('sport', sport);
+            if (league) params.append('league', league);
+            
+            try {
+                showLoading(true);
+                const response = await fetch(`/api/games?${params}`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    updateGamesTable(data.games);
+                } else {
+                    showNotification('Failed to filter games', 'error');
+                }
+            } catch (error) {
+                console.error('Error filtering games:', error);
+                showNotification('Error filtering games', 'error');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        async function createGame() {
+            const form = document.getElementById('createGameForm');
+            const formData = new FormData(form);
+            const data = Object.fromEntries(formData);
+            
+            try {
+                showLoading(true);
+                const response = await fetch('/api/games', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(data)
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showNotification('Game created successfully!', 'success');
+                    bootstrap.Modal.getInstance(document.getElementById('createGameModal')).hide();
+                    form.reset();
+                    loadGames();
+                } else {
+                    showNotification(result.error || 'Failed to create game', 'error');
+                }
+            } catch (error) {
+                console.error('Create game error:', error);
+                showNotification('Error creating game', 'error');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // ======================================
+        // OFFICIALS MANAGEMENT
+        // ======================================
+
+        async function loadOfficials() {
+            try {
+                showLoading(true);
+                const response = await fetch('/api/officials');
+                const data = await response.json();
+                
+                if (data.success) {
+                    updateOfficialsTable(data.officials);
+                } else {
+                    showNotification('Failed to load officials', 'error');
+                }
+            } catch (error) {
+                console.error('Error loading officials:', error);
+                showNotification('Error loading officials', 'error');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        function updateOfficialsTable(officials) {
+            const tbody = document.getElementById('officials-table-body');
+            
+            if (officials.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted">No officials found</td></tr>';
+                return;
+            }
+            
+            tbody.innerHTML = officials.map(official => `
+                <tr>
+                    <td>
+                        <div class="fw-semibold">${official.name}</div>
+                        ${official.certifications ? `<small class="text-muted">${official.certifications}</small>` : ''}
+                    </td>
+                    <td>${official.email || '-'}</td>
+                    <td>${official.phone || '-'}</td>
+                    <td>
+                        <span class="badge bg-info">${official.experience_level || 'Not Set'}</span>
+                    </td>
+                    <td>
+                        <div class="d-flex align-items-center">
+                            <span class="me-2">${(official.rating || 0).toFixed(1)}</span>
+                            ${generateStarRating(official.rating || 0)}
+                        </div>
+                    </td>
+                    <td>
+                        <span class="badge bg-secondary">${official.total_assignments || 0}</span>
+                    </td>
+                    <td>${getStatusBadge(official.is_active ? 'active' : 'inactive')}</td>
+                    <td>
+                        <div class="action-buttons">
+                            <button class="btn btn-outline-info btn-sm" onclick="viewOfficialDetails(${official.id})" title="View Details">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                            <button class="btn btn-outline-primary btn-sm" onclick="editItem(${official.id}, 'official')" title="Edit">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button class="btn btn-outline-danger btn-sm" onclick="deleteItem(${official.id}, 'official')" title="Delete">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function generateStarRating(rating) {
+            const stars = [];
+            for (let i = 1; i <= 5; i++) {
+                if (i <= rating) {
+                    stars.push('<i class="fas fa-star text-warning"></i>');
+                } else if (i - 0.5 <= rating) {
+                    stars.push('<i class="fas fa-star-half-alt text-warning"></i>');
+                } else {
+                    stars.push('<i class="far fa-star text-warning"></i>');
+                }
+            }
+            return stars.join('');
+        }
+
+        async function applyOfficialsFilter() {
+            const search = document.getElementById('officials-search').value;
+            const experienceLevel = document.getElementById('officials-experience-filter').value;
+            
+            const params = new URLSearchParams();
+            if (search) params.append('search', search);
+            if (experienceLevel) params.append('experience_level', experienceLevel);
+            
+            try {
+                showLoading(true);
+                const response = await fetch(`/api/officials?${params}`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    updateOfficialsTable(data.officials);
+                } else {
+                    showNotification('Failed to filter officials', 'error');
+                }
+            } catch (error) {
+                console.error('Error filtering officials:', error);
+                showNotification('Error filtering officials', 'error');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        async function createOfficial() {
+            const form = document.getElementById('createOfficialForm');
+            const formData = new FormData(form);
+            const data = Object.fromEntries(formData);
+            
+            try {
+                showLoading(true);
+                const response = await fetch('/api/officials', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(data)
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showNotification('Official created successfully!', 'success');
+                    bootstrap.Modal.getInstance(document.getElementById('createOfficialModal')).hide();
+                    form.reset();
+                    loadOfficials();
+                } else {
+                    showNotification(result.error || 'Failed to create official', 'error');
+                }
+            } catch (error) {
+                console.error('Create official error:', error);
+                showNotification('Error creating official', 'error');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        async function viewOfficialDetails(officialId) {
+            try {
+                const response = await fetch(`/api/officials/${officialId}`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    // Show official details in a modal or expand the row
+                    showNotification('Official details feature coming soon!', 'info');
+                } else {
+                    showNotification('Failed to load official details', 'error');
+                }
+            } catch (error) {
+                console.error('Error loading official details:', error);
+                showNotification('Error loading official details', 'error');
+            }
+        }
+
+        // ======================================
+        // ASSIGNMENTS MANAGEMENT
+        // ======================================
+
+        async function loadAssignments() {
+            try {
+                showLoading(true);
+                const response = await fetch('/api/assignments');
+                const data = await response.json();
+                
+                if (data.success) {
+                    updateAssignmentsTable(data.assignments);
+                } else {
+                    showNotification('Failed to load assignments', 'error');
+                }
+            } catch (error) {
+                console.error('Error loading assignments:', error);
+                showNotification('Error loading assignments', 'error');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        function updateAssignmentsTable(assignments) {
+            const tbody = document.getElementById('assignments-table-body');
+            
+            if (assignments.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted">No assignments found</td></tr>';
+                return;
+            }
+            
+            tbody.innerHTML = assignments.map(assignment => `
+                <tr>
+                    <td>
+                        <div>${formatDate(assignment.date)} ${assignment.time}</div>
+                        <small class="text-muted">${assignment.sport}</small>
+                    </td>
+                    <td>
+                        <div><strong>${assignment.home_team}</strong> vs <strong>${assignment.away_team}</strong></div>
+                        <small class="text-muted">${assignment.location}</small>
+                    </td>
+                    <td>
+                        <div class="fw-semibold">${assignment.official_name}</div>
+                        <small class="text-muted">${assignment.official_email || ''}</small>
+                    </td>
+                    <td><span class="badge bg-info">${assignment.position || 'Official'}</span></td>
+                    <td>${getStatusBadge(assignment.status)}</td>
+                    <td>${formatDate(assignment.assigned_date)}</td>
+                    <td>
+                        <div class="action-buttons">
+                            <button class="btn btn-outline-primary btn-sm" onclick="editItem(${assignment.id}, 'assignment')" title="Edit">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button class="btn btn-outline-danger btn-sm" onclick="deleteItem(${assignment.id}, 'assignment')" title="Delete">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        async function applyAssignmentsFilter() {
+            const status = document.getElementById('assignments-status-filter').value;
+            const dateFrom = document.getElementById('assignments-date-from').value;
+            const dateTo = document.getElementById('assignments-date-to').value;
+            
+            const params = new URLSearchParams();
+            if (status) params.append('status', status);
+            if (dateFrom) params.append('date_from', dateFrom);
+            if (dateTo) params.append('date_to', dateTo);
+            
+            try {
+                showLoading(true);
+                const response = await fetch(`/api/assignments?${params}`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    updateAssignmentsTable(data.assignments);
+                } else {
+                    showNotification('Failed to filter assignments', 'error');
+                }
+            } catch (error) {
+                console.error('Error filtering assignments:', error);
+                showNotification('Error filtering assignments', 'error');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        async function createAssignment() {
+            const form = document.getElementById('createAssignmentForm');
+            const formData = new FormData(form);
+            const data = Object.fromEntries(formData);
+            
+            try {
+                showLoading(true);
+                const response = await fetch('/api/assignments', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(data)
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showNotification('Assignment created successfully!', 'success');
+                    bootstrap.Modal.getInstance(document.getElementById('createAssignmentModal')).hide();
+                    form.reset();
+                    loadAssignments();
+                } else {
+                    showNotification(result.error || 'Failed to create assignment', 'error');
+                }
+            } catch (error) {
+                console.error('Create assignment error:', error);
+                showNotification('Error creating assignment', 'error');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // ======================================
+        // LOCATIONS MANAGEMENT
+        // ======================================
+
+        async function loadLocations() {
+            try {
+                showLoading(true);
+                const response = await fetch('/api/locations');
+                const data = await response.json();
+                
+                if (data.success) {
+                    updateLocationsTable(data.locations);
+                } else {
+                    showNotification('Failed to load locations', 'error');
+                }
+            } catch (error) {
+                console.error('Error loading locations:', error);
+                showNotification('Error loading locations', 'error');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        function updateLocationsTable(locations) {
+            const tbody = document.getElementById('locations-table-body');
+            
+            if (locations.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted">No locations found</td></tr>';
+                return;
+            }
+            
+            tbody.innerHTML = locations.map(location => `
+                <tr>
+                    <td>
+                        <div class="fw-semibold">${location.name}</div>
+                    </td>
+                    <td>${location.address || '-'}</td>
+                    <td>${location.city || '-'}</td>
+                    <td>${location.state || '-'}</td>
+                    <td>${location.capacity || 0}</td>
+                    <td>
+                        ${location.contact_person ? `<div>${location.contact_person}</div>` : ''}
+                        ${location.phone ? `<small class="text-muted">${location.phone}</small>` : ''}
+                    </td>
+                    <td>
+                        <div class="action-buttons">
+                            <button class="btn btn-outline-primary btn-sm" onclick="editItem(${location.id}, 'location')" title="Edit">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button class="btn btn-outline-danger btn-sm" onclick="deleteItem(${location.id}, 'location')" title="Delete">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        async function applyLocationsFilter() {
+            const search = document.getElementById('locations-search').value;
+            
+            const params = new URLSearchParams();
+            if (search) params.append('search', search);
+            
+            try {
+                showLoading(true);
+                const response = await fetch(`/api/locations?${params}`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    updateLocationsTable(data.locations);
+                } else {
+                    showNotification('Failed to filter locations', 'error');
+                }
+            } catch (error) {
+                console.error('Error filtering locations:', error);
+                showNotification('Error filtering locations', 'error');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        async function createLocation() {
+            const form = document.getElementById('createLocationForm');
+            const formData = new FormData(form);
+            const data = Object.fromEntries(formData);
+            
+            try {
+                showLoading(true);
+                const response = await fetch('/api/locations', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(data)
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showNotification('Location created successfully!', 'success');
+                    bootstrap.Modal.getInstance(document.getElementById('createLocationModal')).hide();
+                    form.reset();
+                    loadLocations();
+                } else {
+                    showNotification(result.error || 'Failed to create location', 'error');
+                }
+            } catch (error) {
+                console.error('Create location error:', error);
+                showNotification('Error creating location', 'error');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // ======================================
+        // USERS MANAGEMENT
+        // ======================================
+
+        async function loadUsers() {
+            try {
+                showLoading(true);
+                const response = await fetch('/api/users');
+                const data = await response.json();
+                
+                if (data.success) {
+                    updateUsersTable(data.users);
+                } else {
+                    showNotification('Failed to load users', 'error');
+                }
+            } catch (error) {
+                console.error('Error loading users:', error);
+                showNotification('Error loading users', 'error');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        function updateUsersTable(users) {
+            const tbody = document.getElementById('users-table-body');
+            
+            if (users.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted">No users found</td></tr>';
+                return;
+            }
+            
+            tbody.innerHTML = users.map(user => `
+                <tr>
+                    <td>
+                        <div class="fw-semibold">${user.username}</div>
+                    </td>
+                    <td>${user.full_name}</td>
+                    <td>${user.email || '-'}</td>
+                    <td>
+                        <span class="badge bg-${getRoleBadgeColor(user.role)}">${user.role.charAt(0).toUpperCase() + user.role.slice(1)}</span>
+                    </td>
+                    <td>${getStatusBadge(user.is_active ? 'active' : 'inactive')}</td>
+                    <td>${user.last_login ? formatDateTime(user.last_login) : 'Never'}</td>
+                    <td>
+                        <div class="action-buttons">
+                            <button class="btn btn-outline-primary btn-sm" onclick="editItem(${user.id}, 'user')" title="Edit">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            ${user.id !== parseInt('{{ session.user_id }}') ? `
+                                <button class="btn btn-outline-danger btn-sm" onclick="deleteItem(${user.id}, 'user')" title="Delete">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            ` : ''}
+                        </div>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function getRoleBadgeColor(role) {
+            const colors = {
+                'user': 'secondary',
+                'official': 'info',
+                'admin': 'warning',
+                'superadmin': 'danger'
+            };
+            return colors[role] || 'secondary';
+        }
+
+        async function applyUsersFilter() {
+            const search = document.getElementById('users-search').value;
+            const role = document.getElementById('users-role-filter').value;
+            
+            const params = new URLSearchParams();
+            if (search) params.append('search', search);
+            if (role) params.append('role', role);
+            
+            try {
+                showLoading(true);
+                const response = await fetch(`/api/users?${params}`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    updateUsersTable(data.users);
+                } else {
+                    showNotification('Failed to filter users', 'error');
+                }
+            } catch (error) {
+                console.error('Error filtering users:', error);
+                showNotification('Error filtering users', 'error');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        async function createUser() {
+            const form = document.getElementById('createUserForm');
+            const formData = new FormData(form);
+            const data = Object.fromEntries(formData);
+            
+            try {
+                showLoading(true);
+                const response = await fetch('/api/users', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(data)
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showNotification('User created successfully!', 'success');
+                    bootstrap.Modal.getInstance(document.getElementById('createUserModal')).hide();
+                    form.reset();
+                    loadUsers();
+                } else {
+                    showNotification(result.error || 'Failed to create user', 'error');
+                }
+            } catch (error) {
+                console.error('Create user error:', error);
+                showNotification('Error creating user', 'error');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // ======================================
+        // REPORTS AND ANALYTICS
+        // ======================================
+
+        async function loadReports() {
+            try {
+                showLoading(true);
+                const response = await fetch('/api/reports/stats');
+                const data = await response.json();
+                
+                if (data.success) {
+                    updateReportsContent(data.stats);
+                } else {
+                    showNotification('Failed to load reports', 'error');
+                }
+            } catch (error) {
+                console.error('Error loading reports:', error);
+                showNotification('Error loading reports', 'error');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        function updateReportsContent(stats) {
+            const container = document.getElementById('reports-content');
+            
+            container.innerHTML = `
+                <div class="row g-4">
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header">
+                                <h6 class="mb-0">Games by Status</h6>
+                            </div>
+                            <div class="card-body">
+                                ${(stats.games_by_status || []).map(item => `
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <span>${item.status.charAt(0).toUpperCase() + item.status.slice(1)}</span>
+                                        <span class="badge bg-primary">${item.count}</span>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header">
+                                <h6 class="mb-0">Assignments by Status</h6>
+                            </div>
+                            <div class="card-body">
+                                ${(stats.assignments_by_status || []).map(item => `
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <span>${item.status.charAt(0).toUpperCase() + item.status.slice(1)}</span>
+                                        <span class="badge bg-success">${item.count}</span>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="row g-4 mt-3">
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header">
+                                <h6 class="mb-0">Officials by Experience</h6>
+                            </div>
+                            <div class="card-body">
+                                ${(stats.officials_by_experience || []).map(item => `
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <span>${item.experience_level}</span>
+                                        <span class="badge bg-info">${item.count}</span>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header">
+                                <h6 class="mb-0">Top Officials</h6>
+                            </div>
+                            <div class="card-body">
+                                ${(stats.top_officials || []).slice(0, 5).map(official => `
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <div>
+                                            <div class="fw-semibold">${official.name}</div>
+                                            <small class="text-muted">Rating: ${(official.avg_rating || 0).toFixed(1)}</small>
+                                        </div>
+                                        <span class="badge bg-warning">${official.assignment_count} assignments</span>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function generateReport(type) {
+            showNotification(`Generating ${type} report...`, 'info');
+            // This would typically open a detailed report modal or navigate to a report page
+        }
+
+        // ======================================
+        // MODAL AND CRUD OPERATIONS
+        // ======================================
+
+        function openCreateModal(type) {
+            const modalId = `create${type.charAt(0).toUpperCase() + type.slice(1)}Modal`;
+            const modal = new bootstrap.Modal(document.getElementById(modalId));
+            modal.show();
+        }
+
+        async function editItem(id, type) {
+            currentEditId = id;
+            currentEditType = type;
+            
+            try {
+                showLoading(true);
+                const response = await fetch(`/api/${type}s/${id}`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    const item = data[type] || data.user || data.game || data.official || data.assignment || data.location;
+                    populateEditModal(item, type);
+                    const modal = new bootstrap.Modal(document.getElementById('editModal'));
+                    modal.show();
+                } else {
+                    showNotification(`Failed to load ${type} for editing`, 'error');
+                }
+            } catch (error) {
+                console.error(`Edit ${type} error:`, error);
+                showNotification(`Error loading ${type} for editing`, 'error');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        function populateEditModal(item, type) {
+            const title = document.getElementById('editModalTitle');
+            const body = document.getElementById('editModalBody');
+            
+            title.innerHTML = `<i class="fas fa-edit me-2"></i>Edit ${type.charAt(0).toUpperCase() + type.slice(1)}`;
+            
+            let formHTML = '';
+            
+            switch(type) {
+                case 'game':
+                    formHTML = generateGameEditForm(item);
+                    break;
+                case 'official':
+                    formHTML = generateOfficialEditForm(item);
+                    break;
+                case 'assignment':
+                    formHTML = generateAssignmentEditForm(item);
+                    break;
+                case 'user':
+                    formHTML = generateUserEditForm(item);
+                    break;
+                case 'location':
+                    formHTML = generateLocationEditForm(item);
+                    break;
+                default:
+                    formHTML = '<p>Edit form not available for this item type.</p>';
+            }
+            
+            body.innerHTML = formHTML;
+        }
+
+        function generateGameEditForm(game) {
+            return `
+                <form id="editForm">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Date *</label>
+                            <input type="date" class="form-control" name="date" value="${game.date}" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Time *</label>
+                            <input type="time" class="form-control" name="time" value="${game.time}" required>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Home Team *</label>
+                            <input type="text" class="form-control" name="home_team" value="${game.home_team}" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Away Team *</label>
+                            <input type="text" class="form-control" name="away_team" value="${game.away_team}" required>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Location *</label>
+                            <input type="text" class="form-control" name="location" value="${game.location}" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Sport *</label>
+                            <input type="text" class="form-control" name="sport" value="${game.sport}" required>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">League</label>
+                            <input type="text" class="form-control" name="league" value="${game.league || ''}">
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Level</label>
+                            <input type="text" class="form-control" name="level" value="${game.level || ''}">
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Officials Needed</label>
+                            <input type="number" class="form-control" name="officials_needed" value="${game.officials_needed || 1}" min="1">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Notes</label>
+                        <textarea class="form-control" name="notes" rows="3">${game.notes || ''}</textarea>
+                    </div>
+                </form>
+            `;
+        }
+
+        function generateOfficialEditForm(official) {
+            return `
+                <form id="editForm">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Name *</label>
+                            <input type="text" class="form-control" name="name" value="${official.name}" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Email *</label>
+                            <input type="email" class="form-control" name="email" value="${official.email}" required>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Phone</label>
+                            <input type="tel" class="form-control" name="phone" value="${official.phone || ''}">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Experience Level</label>
+                            <select class="form-select" name="experience_level">
+                                <option value="Beginner" ${official.experience_level === 'Beginner' ? 'selected' : ''}>Beginner</option>
+                                <option value="Intermediate" ${official.experience_level === 'Intermediate' ? 'selected' : ''}>Intermediate</option>
+                                <option value="Advanced" ${official.experience_level === 'Advanced' ? 'selected' : ''}>Advanced</option>
+                                <option value="Expert" ${official.experience_level === 'Expert' ? 'selected' : ''}>Expert</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Certifications</label>
+                            <input type="text" class="form-control" name="certifications" value="${official.certifications || ''}">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Rating</label>
+                            <input type="number" class="form-control" name="rating" value="${official.rating || 0}" min="0" max="5" step="0.1">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Availability</label>
+                        <select class="form-select" name="availability">
+                            <option value="Flexible" ${official.availability === 'Flexible' ? 'selected' : ''}>Flexible</option>
+                            <option value="Weekends Only" ${official.availability === 'Weekends Only' ? 'selected' : ''}>Weekends Only</option>
+                            <option value="Evenings" ${official.availability === 'Evenings' ? 'selected' : ''}>Evenings</option>
+                            <option value="Limited" ${official.availability === 'Limited' ? 'selected' : ''}>Limited</option>
+                        </select>
+                    </div>
+                </form>
+            `;
+        }
+
+        function generateAssignmentEditForm(assignment) {
+            return `
+                <form id="editForm">
+                    <div class="mb-3">
+                        <label class="form-label">Position</label>
+                        <select class="form-select" name="position">
+                            <option value="Official" ${assignment.position === 'Official' ? 'selected' : ''}>Official</option>
+                            <option value="Referee" ${assignment.position === 'Referee' ? 'selected' : ''}>Referee</option>
+                            <option value="Umpire" ${assignment.position === 'Umpire' ? 'selected' : ''}>Umpire</option>
+                            <option value="Crew Chief" ${assignment.position === 'Crew Chief' ? 'selected' : ''}>Crew Chief</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Status</label>
+                        <select class="form-select" name="status">
+                            <option value="pending" ${assignment.status === 'pending' ? 'selected' : ''}>Pending</option>
+                            <option value="confirmed" ${assignment.status === 'confirmed' ? 'selected' : ''}>Confirmed</option>
+                            <option value="declined" ${assignment.status === 'declined' ? 'selected' : ''}>Declined</option>
+                            <option value="completed" ${assignment.status === 'completed' ? 'selected' : ''}>Completed</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Notes</label>
+                        <textarea class="form-control" name="notes" rows="3">${assignment.notes || ''}</textarea>
+                    </div>
+                </form>
+            `;
+        }
+
+        function generateUserEditForm(user) {
+            return `
+                <form id="editForm">
+                    <div class="mb-3">
+                        <label class="form-label">Username *</label>
+                        <input type="text" class="form-control" name="username" value="${user.username}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Full Name *</label>
+                        <input type="text" class="form-control" name="full_name" value="${user.full_name}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Email *</label>
+                        <input type="email" class="form-control" name="email" value="${user.email}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Phone</label>
+                        <input type="tel" class="form-control" name="phone" value="${user.phone || ''}">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">New Password (leave blank to keep current)</label>
+                        <input type="password" class="form-control" name="password">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Role *</label>
+                        <select class="form-select" name="role" required>
+                            <option value="user" ${user.role === 'user' ? 'selected' : ''}>User</option>
+                            <option value="official" ${user.role === 'official' ? 'selected' : ''}>Official</option>
+                            <option value="admin" ${user.role === 'admin' ? 'selected' : ''}>Admin</option>
+                            <option value="superadmin" ${user.role === 'superadmin' ? 'selected' : ''}>Super Admin</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" name="is_active" value="1" ${user.is_active ? 'checked' : ''}>
+                            <label class="form-check-label">Active User</label>
+                        </div>
+                    </div>
+                </form>
+            `;
+        }
+
+        function generateLocationEditForm(location) {
+            return `
+                <form id="editForm">
+                    <div class="mb-3">
+                        <label class="form-label">Location Name *</label>
+                        <input type="text" class="form-control" name="name" value="${location.name}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Address</label>
+                        <input type="text" class="form-control" name="address" value="${location.address || ''}">
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">City</label>
+                            <input type="text" class="form-control" name="city" value="${location.city || ''}">
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <label class="form-label">State</label>
+                            <input type="text" class="form-control" name="state" value="${location.state || ''}" maxlength="2">
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <label class="form-label">ZIP</label>
+                            <input type="text" class="form-control" name="zip_code" value="${location.zip_code || ''}" maxlength="10">
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Contact Person</label>
+                            <input type="text" class="form-control" name="contact_person" value="${location.contact_person || ''}">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Phone</label>
+                            <input type="tel" class="form-control" name="phone" value="${location.phone || ''}">
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Email</label>
+                            <input type="email" class="form-control" name="email" value="${location.email || ''}">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Capacity</label>
+                            <input type="number" class="form-control" name="capacity" value="${location.capacity || 0}" min="0">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Notes</label>
+                        <textarea class="form-control" name="notes" rows="3">${location.notes || ''}</textarea>
+                    </div>
+                </form>
+            `;
+        }
+
+        async function saveEdit() {
+            if (!currentEditId || !currentEditType) {
+                showNotification('Edit session invalid', 'error');
+                return;
+            }
+            
+            const form = document.getElementById('editForm');
+            const formData = new FormData(form);
+            const data = Object.fromEntries(formData);
+            
+            // Handle checkbox for is_active
+            if (currentEditType === 'user') {
+                data.is_active = formData.has('is_active') ? 1 : 0;
+            }
+            
+            try {
+                showLoading(true);
+                const response = await fetch(`/api/${currentEditType}s/${currentEditId}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(data)
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showNotification(`${currentEditType.charAt(0).toUpperCase() + currentEditType.slice(1)} updated successfully!`, 'success');
+                    bootstrap.Modal.getInstance(document.getElementById('editModal')).hide();
+                    refreshCurrentSection();
+                } else {
+                    showNotification(result.error || `Failed to update ${currentEditType}`, 'error');
+                }
+            } catch (error) {
+                console.error(`Update ${currentEditType} error:`, error);
+                showNotification(`Error updating ${currentEditType}`, 'error');
+            } finally {
+                showLoading(false);
+                currentEditId = null;
+                currentEditType = null;
+            }
+        }
+
+        async function deleteItem(id, type) {
+            const itemName = type.charAt(0).toUpperCase() + type.slice(1);
+            
+            if (!confirm(`Are you sure you want to delete this ${type}? This action cannot be undone.`)) {
+                return;
+            }
+            
+            try {
+                showLoading(true);
+                const response = await fetch(`/api/${type}s/${id}`, {
+                    method: 'DELETE'
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showNotification(`${itemName} deleted successfully!`, 'success');
+                    refreshCurrentSection();
+                } else {
+                    showNotification(result.error || `Failed to delete ${type}`, 'error');
+                }
+            } catch (error) {
+                console.error(`Delete ${type} error:`, error);
+                showNotification(`Error deleting ${type}`, 'error');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // ======================================
+        // EXPORT FUNCTIONS
+        // ======================================
+
+        async function exportData(type) {
+            try {
+                showLoading(true);
+                showNotification(`Preparing ${type} export...`, 'info');
+                
+                const response = await fetch(`/api/export/${type}`);
+                
+                if (response.ok) {
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.style.display = 'none';
+                    a.href = url;
+                    a.download = `${type}_export_${new Date().toISOString().split('T')[0]}.csv`;
+                    document.body.appendChild(a);
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                    document.body.removeChild(a);
+                    
+                    showNotification(`${type.charAt(0).toUpperCase() + type.slice(1)} exported successfully!`, 'success');
+                } else {
+                    throw new Error('Export failed');
+                }
+            } catch (error) {
+                console.error(`Export ${type} error:`, error);
+                showNotification(`Error exporting ${type}`, 'error');
+            } finally {
+                showLoading(false);
+            }
+        }
+    </script>
+</body>
+</html>
